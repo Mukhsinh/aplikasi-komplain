@@ -160,7 +160,7 @@ export default function SurveiPage() {
                                         name="unitId"
                                         control={control}
                                         render={({ field }) => (
-                                            <select {...field} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-semibold text-slate-900 outline-none transition-all">
+                                            <select {...field} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-semibold !text-slate-900 outline-none transition-all">
                                                 <option value="" disabled>Pilih Unit Layanan...</option>
                                                 {units.map(u => <option key={u.id} value={u.id}>{u.nama}</option>)}
                                             </select>
@@ -217,7 +217,7 @@ export default function SurveiPage() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><GraduationCap className="w-4 h-4 text-emerald-500" /> Pendidikan</label>
-                                        <select {...register('pendidikan')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-medium text-slate-700 outline-none transition-all">
+                                        <select {...register('pendidikan')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-semibold !text-slate-900 outline-none transition-all">
                                             <option value="" disabled>Pilih Kualifikasi...</option>
                                             {PENDIDIKAN_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                         </select>
@@ -225,7 +225,7 @@ export default function SurveiPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-bold text-slate-700 flex items-center gap-2"><Briefcase className="w-4 h-4 text-emerald-500" /> Pekerjaan</label>
-                                        <select {...register('pekerjaan')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-medium text-slate-700 outline-none transition-all">
+                                        <select {...register('pekerjaan')} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-semibold !text-slate-900 outline-none transition-all">
                                             <option value="" disabled>Pilih Bidang...</option>
                                             {PEKERJAAN_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                         </select>
@@ -349,7 +349,7 @@ export default function SurveiPage() {
                                         <textarea
                                             {...field}
                                             rows={6}
-                                            className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm text-slate-900 resize-none font-semibold"
+                                            className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm !text-slate-900 resize-none font-semibold"
                                             placeholder="Opini, saran, kritik, atau pengalaman Anda..."
                                         />
                                     </div>

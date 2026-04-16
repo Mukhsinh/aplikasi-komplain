@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { LogIn, KeyRound } from 'lucide-react'
 import FloatingLabelInput from '@/components/FloatingLabelInput'
@@ -9,6 +9,16 @@ import { createClient } from '@/utils/supabase/client'
 
 export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false)
+    const [appName, setAppName] = useState('KASIH')
+
+    useEffect(() => {
+        const fetchAppName = async () => {
+            const supabase = createClient()
+            const { data } = await supabase.from('app_settings').select('setting_value').eq('setting_key', 'app_name').single()
+            if (data?.setting_value) setAppName(data.setting_value)
+        }
+        fetchAppName()
+    }, [])
 
     const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -48,7 +58,7 @@ export default function LoginPage() {
                         <KeyRound className="w-8 h-8 text-emerald-400" />
                     </div>
                     <h1 className="text-3xl font-extrabold text-white tracking-tight">Portal Admin</h1>
-                    <p className="text-slate-400 font-medium text-sm mt-1">CareConnect Hub Enterprise System</p>
+                    <p className="text-slate-400 font-medium text-sm mt-1">{appName} Enterprise System</p>
                 </div>
 
                 <div className="glass-panel bg-white p-8 rounded-[2rem] shadow-2xl relative overflow-hidden">
@@ -83,7 +93,7 @@ export default function LoginPage() {
                         </button>
 
                         <p className="text-center text-xs text-slate-500 font-medium mt-6">
-                            © 2026 CareConnect Enterprise
+                            © {new Date().getFullYear()} {appName} Enterprise
                         </p>
                     </form>
                 </div>

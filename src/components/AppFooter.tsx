@@ -26,9 +26,7 @@ export default function AppFooter() {
             <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
                 &copy; {new Date().getFullYear()} {appName}. All rights reserved.
             </p>
-            {footerText && (
-                <p className="text-[9px] text-slate-500 mt-0.5">{footerText}</p>
-            )}
+            <p className="text-[9px] text-slate-500 mt-0.5">Sistem Layanan {appName} Terpadu</p>
         </footer>
     )
 }

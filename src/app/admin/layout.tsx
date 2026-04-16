@@ -51,12 +51,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const [userProfile, setUserProfile] = useState<any>(null)
     const [unreadTicketsCount, setUnreadTicketsCount] = useState(0)
     const [isNotifOpen, setIsNotifOpen] = useState(false)
+    const [appName, setAppName] = useState('KASIH')
     const pathname = usePathname()
     const router = useRouter()
 
     useEffect(() => {
         const fetchUserData = async () => {
             const supabase = createClient()
+
+            // Fetch app name from settings
+            const { data: settingsData } = await supabase.from('app_settings').select('setting_key, setting_value').eq('setting_key', 'app_name').single()
+            if (settingsData?.setting_value) setAppName(settingsData.setting_value)
+
             const { data: { session } } = await supabase.auth.getSession()
             if (session?.user) {
                 const { data: profile } = await supabase
@@ -102,8 +108,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 isMobileOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 <div className="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800">
-                    <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold mr-3">C</div>
-                    <span className="text-lg font-bold text-white tracking-wide">CareConnect Admin</span>
+                    <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white font-bold mr-3">{appName.charAt(0)}</div>
+                    <span className="text-lg font-bold text-white tracking-wide">{appName} Admin</span>
                     <button className="ml-auto lg:hidden" onClick={() => setIsMobileOpen(false)}>
                         <X className="w-6 h-6" />
                     </button>

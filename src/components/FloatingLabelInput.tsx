@@ -23,7 +23,7 @@ export default function FloatingLabelInput({ label, error, className, ...props }
                     props.onBlur && props.onBlur(e)
                 }}
                 className={`
-          block w-full px-4 pt-6 pb-2 text-sm text-slate-900 font-semibold bg-slate-50 border-b-2 rounded-t-xl 
+          block w-full px-4 pt-6 pb-2 text-sm !text-slate-900 font-semibold bg-slate-50 border-b-2 rounded-t-xl 
           appearance-none focus:outline-none focus:ring-0 transition-colors
           ${error ? 'border-destructive focus:border-destructive' : 'border-slate-200 focus:border-primary'}
           ${className || ''}

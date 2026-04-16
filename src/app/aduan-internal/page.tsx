@@ -104,15 +104,15 @@ export default function AduanInternalPage() {
                             </div>
                             <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl text-amber-800 text-xs font-medium">Kerahasiaan data pelapor akan dijaga. Nama dan NIP bersifat opsional untuk perlindungan pelapor.</div>
                             <div className="space-y-4">
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Nama / NIK <span className="text-slate-400">(Opsional)</span></label><input value={form.nama} onChange={e => set('nama', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all" placeholder="Boleh dikosongkan" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Nama / NIK <span className="text-slate-400">(Opsional)</span></label><input value={form.nama} onChange={e => set('nama', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all" placeholder="Boleh dikosongkan" /></div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-600 mb-2 block">Unit Kerja Asal <span className="text-red-500">*</span></label>
-                                    <select value={form.unitAsal} onChange={e => set('unitAsal', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all">
+                                    <select value={form.unitAsal} onChange={e => set('unitAsal', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all">
                                         <option value="" disabled>Pilih Unit Kerja...</option>
                                         {unitOptions.map(u => <option key={u.id} value={u.nama}>{u.nama}</option>)}
                                     </select>
                                 </div>
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Jabatan <span className="text-slate-400">(Opsional)</span></label><input value={form.jabatan} onChange={e => set('jabatan', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all" placeholder="Jabatan Anda" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Jabatan <span className="text-slate-400">(Opsional)</span></label><input value={form.jabatan} onChange={e => set('jabatan', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all" placeholder="Jabatan Anda" /></div>
                             </div>
                             <button type="button" onClick={() => setStep(2)} disabled={!canProceed1} className="mt-6 w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50 transition-all hover:bg-slate-800">Lanjutkan &rarr;</button>
                         </div>
@@ -163,10 +163,10 @@ export default function AduanInternalPage() {
                                 <div><h3 className="font-bold text-slate-800 text-sm">3. Detail Kejadian</h3><p className="text-[10px] text-slate-500 font-semibold">Data naratif untuk investigasi (5W+1H)</p></div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Waktu & Lokasi Kejadian</label><input value={form.waktuLokasi} onChange={e => set('waktuLokasi', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all" placeholder="Misal: Senin 14 April, Ruang ICU" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Waktu & Lokasi Kejadian</label><input value={form.waktuLokasi} onChange={e => set('waktuLokasi', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all" placeholder="Misal: Senin 14 April, Ruang ICU" /></div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-600 mb-1 block">Unit Kerja yang Dilaporkan</label>
-                                    <select value={form.unitDilaporkan} onChange={e => set('unitDilaporkan', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all">
+                                    <select value={form.unitDilaporkan} onChange={e => set('unitDilaporkan', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all">
                                         <option value="" disabled>Pilih Unit Kerja...</option>
                                         {unitOptions.map(u => <option key={u.id} value={u.nama}>{u.nama}</option>)}
                                     </select>
@@ -175,7 +175,7 @@ export default function AduanInternalPage() {
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-2 block">Kronologi Kejadian <span className="text-red-500">*</span></label>
                                 <p className="text-xs text-slate-500 mb-2">Gunakan metode 5W+1H: Apa, Siapa, Di mana, Kapan, Mengapa, Bagaimana.</p>
-                                <textarea value={form.kronologi} onChange={e => set('kronologi', e.target.value)} rows={6} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all resize-none" placeholder="Ceritakan secara rinci..." />
+                                <textarea value={form.kronologi} onChange={e => set('kronologi', e.target.value)} rows={6} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all resize-none" placeholder="Ceritakan secara rinci..." />
                                 <p className="text-[10px] text-slate-400 mt-1 text-right">{form.kronologi.length} / min 20 karakter</p>
                             </div>
                             <div className="flex gap-3 mt-6">
@@ -204,7 +204,7 @@ export default function AduanInternalPage() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-2 block">Usulan Perbaikan (Solusi dari Anda)</label>
-                                <textarea value={form.saran} onChange={e => set('saran', e.target.value)} rows={4} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all resize-none" placeholder="Saran perbaikan Anda..." />
+                                <textarea value={form.saran} onChange={e => set('saran', e.target.value)} rows={4} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all resize-none" placeholder="Saran perbaikan Anda..." />
                             </div>
                             <div className="flex gap-3 mt-6">
                                 <button type="button" onClick={() => setStep(3)} className="px-5 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50"><ChevronLeft className="w-5 h-5" /></button>

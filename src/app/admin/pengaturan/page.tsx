@@ -26,6 +26,40 @@ const DEFAULT_SETTINGS = {
     app_name: 'PUAS',
 }
 
+const InputField = ({ value, onChange, label, icon: Icon, placeholder, type = 'text', hint }: { value: string, onChange: (val: string) => void, label: string, icon?: any, placeholder?: string, type?: string, hint?: string }) => (
+    <div>
+        <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2.5 flex items-center gap-2">
+            {Icon && <Icon className="w-3.5 h-3.5 text-slate-400" />}
+            {label}
+        </label>
+        <input
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder || label}
+            className="w-full px-4 py-3 bg-slate-50/80 text-slate-900 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all placeholder:text-slate-300"
+        />
+        {hint && <p className="text-[10px] text-slate-400 mt-1.5 font-medium flex items-center gap-1"><AlertCircle className="w-3 h-3 shrink-0" />{hint}</p>}
+    </div>
+)
+
+const TextAreaField = ({ value, onChange, label, placeholder, rows = 4, hint, positionHint }: { value: string, onChange: (val: string) => void, label: string, placeholder?: string, rows?: number, hint?: string, positionHint?: string }) => (
+    <div>
+        <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center justify-between">
+            {label}
+            {positionHint && <span className="text-[10px] font-semibold px-2.5 py-1 bg-slate-100 text-slate-400 rounded-lg">{positionHint}</span>}
+        </label>
+        <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full bg-slate-50/80 border border-slate-200 rounded-2xl p-5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-semibold text-slate-800 shadow-inner leading-relaxed placeholder:text-slate-300"
+            placeholder={placeholder}
+            rows={rows}
+        />
+        {hint && <p className="text-[10px] text-slate-400 mt-1.5 font-medium">{hint}</p>}
+    </div>
+)
+
 export default function AdminSettingsPage() {
     const [activeMenu, setActiveMenu] = useState('Identitas')
     const [settings, setSettings] = useState<Record<string, string>>(DEFAULT_SETTINGS)
@@ -36,15 +70,16 @@ export default function AdminSettingsPage() {
     useEffect(() => {
         const fetchSettings = async () => {
             const supabase = createClient()
-            const { data } = await supabase.from('app_settings').select('*').limit(1).single()
+            const { data } = await supabase.from('app_settings').select('*')
             if (data) {
                 // Merge database values over defaults
                 const merged = { ...DEFAULT_SETTINGS }
-                for (const key of Object.keys(DEFAULT_SETTINGS)) {
-                    if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
-                        merged[key as keyof typeof DEFAULT_SETTINGS] = String(data[key])
+                data.forEach(item => {
+                    const key = item.setting_key as keyof typeof DEFAULT_SETTINGS
+                    if (merged[key] !== undefined && item.setting_value !== undefined && item.setting_value !== null) {
+                        merged[key] = String(item.setting_value)
                     }
-                }
+                })
                 setSettings(merged)
             }
             setIsLoaded(true)
@@ -62,14 +97,16 @@ export default function AdminSettingsPage() {
         const supabase = createClient()
 
         try {
-            // Upsert as a single row (id = 1 or first row)
-            const { data: existing } = await supabase.from('app_settings').select('id').limit(1).single()
-
-            if (existing) {
-                await supabase.from('app_settings').update(settings).eq('id', existing.id)
-            } else {
-                await supabase.from('app_settings').insert(settings)
-            }
+            // Upsert each setting key-value pair
+            const upsertPromises = Object.entries(settings).map(async ([key, value]) => {
+                const { data: existing } = await supabase.from('app_settings').select('id').eq('setting_key', key).single()
+                if (existing) {
+                    return supabase.from('app_settings').update({ setting_value: value, updated_at: new Date().toISOString() }).eq('id', existing.id)
+                } else {
+                    return supabase.from('app_settings').insert({ setting_key: key, setting_value: value })
+                }
+            })
+            await Promise.all(upsertPromises)
             setSaveStatus('success')
         } catch (error) {
             console.error("Error saving settings:", error)
@@ -85,40 +122,6 @@ export default function AdminSettingsPage() {
         { id: 'SLA & Eskalasi', icon: Clock, desc: 'Batas waktu & peringatan', color: 'text-amber-500 bg-amber-50' },
         { id: 'Format Laporan', icon: FileText, desc: 'Kop surat & tanda tangan', color: 'text-emerald-500 bg-emerald-50' },
     ]
-
-    const InputField = ({ name, label, icon: Icon, placeholder, type = 'text', hint }: { name: string, label: string, icon?: any, placeholder?: string, type?: string, hint?: string }) => (
-        <div>
-            <label className="block text-xs font-bold text-slate-600 uppercase tracking-widest mb-2.5 flex items-center gap-2">
-                {Icon && <Icon className="w-3.5 h-3.5 text-slate-400" />}
-                {label}
-            </label>
-            <input
-                type={type}
-                value={settings[name] || ''}
-                onChange={(e) => handleChange(name, e.target.value)}
-                placeholder={placeholder || label}
-                className="w-full px-4 py-3 bg-slate-50/80 text-slate-900 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all placeholder:text-slate-300"
-            />
-            {hint && <p className="text-[10px] text-slate-400 mt-1.5 font-medium flex items-center gap-1"><AlertCircle className="w-3 h-3 shrink-0" />{hint}</p>}
-        </div>
-    )
-
-    const TextAreaField = ({ name, label, placeholder, rows = 4, hint, positionHint }: { name: string, label: string, placeholder?: string, rows?: number, hint?: string, positionHint?: string }) => (
-        <div>
-            <label className="block text-sm font-bold text-slate-700 mb-3 flex items-center justify-between">
-                {label}
-                {positionHint && <span className="text-[10px] font-semibold px-2.5 py-1 bg-slate-100 text-slate-400 rounded-lg">{positionHint}</span>}
-            </label>
-            <textarea
-                value={settings[name] || ''}
-                onChange={(e) => handleChange(name, e.target.value)}
-                className="w-full bg-slate-50/80 border border-slate-200 rounded-2xl p-5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all font-semibold text-slate-800 shadow-inner leading-relaxed placeholder:text-slate-300"
-                placeholder={placeholder}
-                rows={rows}
-            />
-            {hint && <p className="text-[10px] text-slate-400 mt-1.5 font-medium">{hint}</p>}
-        </div>
-    )
 
     if (!isLoaded) {
         return (
@@ -252,10 +255,10 @@ export default function AdminSettingsPage() {
 
                                 {/* Main identity */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                    <InputField name="app_name" label="Nama Aplikasi" icon={Globe} placeholder="PUAS" hint="Akan tampil di header dan judul halaman" />
-                                    <InputField name="nama_instansi" label="Nama Instansi Induk" icon={Building} placeholder="Pemerintah Kota Sejahtera" />
+                                    <InputField value={settings.app_name || ''} onChange={(val) => handleChange('app_name', val)} label="Nama Aplikasi" icon={Globe} placeholder="PUAS" hint="Akan tampil di header dan judul halaman" />
+                                    <InputField value={settings.nama_instansi || ''} onChange={(val) => handleChange('nama_instansi', val)} label="Nama Instansi Induk" icon={Building} placeholder="Pemerintah Kota Sejahtera" />
                                     <div className="sm:col-span-2">
-                                        <InputField name="nama_sub_instansi" label="Nama Sub Instansi / Satuan Kerja" icon={Building} placeholder="Rumah Sakit Umum Daerah Kota Sejahtera" />
+                                        <InputField value={settings.nama_sub_instansi || ''} onChange={(val) => handleChange('nama_sub_instansi', val)} label="Nama Sub Instansi / Satuan Kerja" icon={Building} placeholder="Rumah Sakit Umum Daerah Kota Sejahtera" />
                                     </div>
                                 </div>
 
@@ -266,10 +269,10 @@ export default function AdminSettingsPage() {
                                     </h3>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                         <div className="sm:col-span-2">
-                                            <InputField name="alamat_instansi" label="Alamat Lengkap" icon={MapPin} placeholder="Jl. Jend. Sudirman No. 123" />
+                                            <InputField value={settings.alamat_instansi || ''} onChange={(val) => handleChange('alamat_instansi', val)} label="Alamat Lengkap" icon={MapPin} placeholder="Jl. Jend. Sudirman No. 123" />
                                         </div>
-                                        <InputField name="kontak_instansi" label="Kontak (Telp/Email)" icon={Phone} placeholder="Telp: (021) 555-0192" />
-                                        <InputField name="website_instansi" label="Website" icon={Globe} placeholder="rsud.sejahtera.go.id" />
+                                        <InputField value={settings.kontak_instansi || ''} onChange={(val) => handleChange('kontak_instansi', val)} label="Kontak (Telp/Email)" icon={Phone} placeholder="Telp: (021) 555-0192" />
+                                        <InputField value={settings.website_instansi || ''} onChange={(val) => handleChange('website_instansi', val)} label="Website" icon={Globe} placeholder="rsud.sejahtera.go.id" />
                                     </div>
                                 </div>
 
@@ -321,8 +324,8 @@ export default function AdminSettingsPage() {
                                             <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/40" />
                                             <h4 className="font-bold text-slate-800 text-sm">Prioritas Normal</h4>
                                         </div>
-                                        <InputField name="sla_normal_limit" label="Batas Waktu Maksimal (Jam)" type="number" placeholder="24" hint="Tiket akan ditandai terlambat setelah melewati batas ini" />
-                                        <InputField name="sla_normal_warning" label="Mulai Peringatan Sejak (Jam)" type="number" placeholder="18" hint="Notifikasi akan dikirim saat mencapai waktu ini" />
+                                        <InputField value={settings.sla_normal_limit || ''} onChange={(val) => handleChange('sla_normal_limit', val)} label="Batas Waktu Maksimal (Jam)" type="number" placeholder="24" hint="Tiket akan ditandai terlambat setelah melewati batas ini" />
+                                        <InputField value={settings.sla_normal_warning || ''} onChange={(val) => handleChange('sla_normal_warning', val)} label="Mulai Peringatan Sejak (Jam)" type="number" placeholder="18" hint="Notifikasi akan dikirim saat mencapai waktu ini" />
                                     </div>
 
                                     {/* High Priority */}
@@ -331,8 +334,8 @@ export default function AdminSettingsPage() {
                                             <div className="w-3 h-3 rounded-full bg-red-500 shadow-sm shadow-red-500/40" />
                                             <h4 className="font-bold text-slate-800 text-sm">Prioritas Tinggi & Urgent</h4>
                                         </div>
-                                        <InputField name="sla_high_limit" label="Batas Waktu Maksimal (Jam)" type="number" placeholder="4" hint="Standar: 2-4 jam untuk tiket kritis" />
-                                        <InputField name="sla_high_warning" label="Mulai Peringatan Sejak (Jam)" type="number" placeholder="2" hint="Peringatan dini sebelum batas waktu tercapai" />
+                                        <InputField value={settings.sla_high_limit || ''} onChange={(val) => handleChange('sla_high_limit', val)} label="Batas Waktu Maksimal (Jam)" type="number" placeholder="4" hint="Standar: 2-4 jam untuk tiket kritis" />
+                                        <InputField value={settings.sla_high_warning || ''} onChange={(val) => handleChange('sla_high_warning', val)} label="Mulai Peringatan Sejak (Jam)" type="number" placeholder="2" hint="Peringatan dini sebelum batas waktu tercapai" />
                                     </div>
                                 </div>
                             </motion.div>
@@ -355,7 +358,8 @@ export default function AdminSettingsPage() {
 
                                 {/* Kop Surat */}
                                 <TextAreaField
-                                    name="print_header"
+                                    value={settings.print_header || ''}
+                                    onChange={(val) => handleChange('print_header', val)}
                                     label="Teks Kop Surat (Header)"
                                     placeholder={"Baris 1 (Nama Pemerintah)\nBaris 2 (Nama Dinas)\nBaris 3 (Nama RSUD/Instansi)"}
                                     rows={4}
@@ -369,18 +373,18 @@ export default function AdminSettingsPage() {
                                         <User className="w-4 h-4 text-primary" /> Penandatangan Default
                                     </h3>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                        <InputField name="nama_penandatangan" label="Nama Penandatangan" icon={User} placeholder="Dr. Mulyadi Saputra, MARS" />
-                                        <InputField name="jabatan_penandatangan" label="Jabatan Penandatangan" icon={ShieldCheck} placeholder="Direktur Utama" />
+                                        <InputField value={settings.nama_penandatangan || ''} onChange={(val) => handleChange('nama_penandatangan', val)} label="Nama Penandatangan" icon={User} placeholder="Dr. Mulyadi Saputra, MARS" />
+                                        <InputField value={settings.jabatan_penandatangan || ''} onChange={(val) => handleChange('jabatan_penandatangan', val)} label="Jabatan Penandatangan" icon={ShieldCheck} placeholder="Direktur Utama" />
                                         <div className="sm:col-span-2">
-                                            <InputField name="nip_penandatangan" label="NIP (Opsional)" placeholder="19760512 200112 1 005" hint="Akan ditampilkan di bawah nama penandatangan jika diisi" />
+                                            <InputField value={settings.nip_penandatangan || ''} onChange={(val) => handleChange('nip_penandatangan', val)} label="NIP (Opsional)" placeholder="19760512 200112 1 005" hint="Akan ditampilkan di bawah nama penandatangan jika diisi" />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Footer */}
                                 <div className="pt-6 border-t border-slate-100">
                                     <TextAreaField
-                                        name="print_footer"
+                                        value={settings.print_footer || ''}
+                                        onChange={(val) => handleChange('print_footer', val)}
                                         label="Catatan Kaki (Footer)"
                                         placeholder="Dokumen ini digenerate secara otomatis oleh Sistem..."
                                         rows={3}

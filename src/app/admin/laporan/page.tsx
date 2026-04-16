@@ -119,7 +119,7 @@ export default function LaporanEksportPage() {
                 })))
                 const workbook = xlsx.utils.book_new()
                 xlsx.utils.book_append_sheet(workbook, worksheet, "Laporan_Tiket")
-                xlsx.writeFile(workbook, `Laporan_CareConnect_${new Date().toISOString().slice(0, 10)}.xlsx`)
+                xlsx.writeFile(workbook, `Laporan_KASIH_${new Date().toISOString().slice(0, 10)}.xlsx`)
             } catch (error) {
                 console.error("XLSX export failed:", error)
                 alert("Gagal melakukan ekspor.")
