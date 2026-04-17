@@ -62,11 +62,17 @@ export default function KomplainPage() {
         const supabase = createClient()
         const trackNo = `CMP-${Math.floor(10000 + Math.random() * 90000)}`
 
+        const unitIdValue = form.unitLokasi && form.unitLokasi !== 'Lainnya' ? form.unitLokasi : null;
+        const targetUnit = unitOptions.find(u => u.id === form.unitLokasi);
+        const storedUnitValue = targetUnit ? targetUnit.nama : form.unitLokasi;
+        const payloadToSave = { ...form, unitLokasi: storedUnitValue };
+
         const { error } = await supabase.from('tickets').insert({
             tracking_number: trackNo,
             jenis: 'komplain_pasien',
             status: 'Terkirim',
-            data_payload: form
+            unit_id: unitIdValue,
+            data_payload: payloadToSave
         })
 
         setTimeout(() => {
@@ -143,13 +149,44 @@ export default function KomplainPage() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className="text-xs font-bold text-slate-600 mb-1 block">Tanggal Kejadian <span className="text-red-500">*</span></label><input type="date" value={form.tglKejadian} onChange={e => set('tglKejadian', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" /></div>
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Jam Kejadian (WIB)</label><input type="time" value={form.jamKejadian} onChange={e => set('jamKejadian', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" /></div>
+                                <div>
+                                    <label className="text-xs font-bold text-slate-600 mb-1 block">Jam Kejadian (WIB)</label>
+                                    <div className="flex items-center gap-2">
+                                        <select
+                                            value={form.jamKejadian ? form.jamKejadian.split(':')[0] : ''}
+                                            onChange={e => {
+                                                const minute = form.jamKejadian ? form.jamKejadian.split(':')[1] : '00'
+                                                set('jamKejadian', `${e.target.value}:${minute}`)
+                                            }}
+                                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                        >
+                                            <option value="" disabled>Jam</option>
+                                            {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map(h => (
+                                                <option key={h} value={h}>{h}</option>
+                                            ))}
+                                        </select>
+                                        <span className="text-lg font-bold text-slate-400">:</span>
+                                        <select
+                                            value={form.jamKejadian ? form.jamKejadian.split(':')[1] : ''}
+                                            onChange={e => {
+                                                const hour = form.jamKejadian ? form.jamKejadian.split(':')[0] : '00'
+                                                set('jamKejadian', `${hour}:${e.target.value}`)
+                                            }}
+                                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                        >
+                                            <option value="" disabled>Menit</option>
+                                            {Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0')).map(m => (
+                                                <option key={m} value={m}>{m}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-2 block">Unit / Lokasi yang Dikeluhkan <span className="text-red-500">*</span></label>
                                 <select value={form.unitLokasi} onChange={e => set('unitLokasi', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                                     <option value="" disabled>Pilih Unit Kerja...</option>
-                                    {unitOptions.map(u => <option key={u.id} value={u.nama}>{u.nama}</option>)}
+                                    {unitOptions.map(u => <option key={u.id} value={u.id}>{u.nama}</option>)}
                                     <option value="Lainnya">Lainnya</option>
                                 </select>
                                 {form.unitLokasi === 'Lainnya' && <input value={form.unitLokasiLain} onChange={e => set('unitLokasiLain', e.target.value)} className="mt-2 w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20" placeholder="Sebutkan lokasi..." />}

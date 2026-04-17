@@ -15,6 +15,8 @@ export default function LaporanEksportPage() {
     const [filterJenis, setFilterJenis] = useState('Semua')
     const [ticketData, setTicketData] = useState<any[]>([])
     const [units, setUnits] = useState<any[]>([])
+    const [userRole, setUserRole] = useState('user')
+    const [userUnitId, setUserUnitId] = useState<string | null>(null)
 
     // Print configuration
     const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10))
@@ -26,8 +28,28 @@ export default function LaporanEksportPage() {
         const fetchData = async () => {
             const supabase = createClient()
 
+            const { data: { session } } = await supabase.auth.getSession()
+            let profileUnitId = null
+            let role = 'user'
+            if (session) {
+                const { data: profile } = await supabase.from('profiles').select('role, unit_id').eq('id', session.user.id).single()
+                if (profile) {
+                    role = profile.role
+                    setUserRole(role)
+                    if (role === 'user') {
+                        profileUnitId = profile.unit_id
+                        setUserUnitId(profile.unit_id)
+                        setFilterUnit(profile.unit_id || 'Semua')
+                    }
+                }
+            }
+
             // 1. Fetch available units
-            const { data: unitsData } = await supabase.from('units').select('id, nama').order('nama')
+            let unitQuery = supabase.from('units').select('id, nama').order('nama')
+            if (role === 'user' && profileUnitId) {
+                unitQuery = unitQuery.eq('id', profileUnitId)
+            }
+            const { data: unitsData } = await unitQuery
             if (unitsData) setUnits(unitsData)
 
             // 2. Fetch app settings (key-value pairs)
@@ -49,7 +71,11 @@ export default function LaporanEksportPage() {
             }
 
             // 3. Fetch all tickets
-            const { data } = await supabase.from('tickets').select('*, units!unit_id(nama)').order('created_at', { ascending: false })
+            let ticketQuery = supabase.from('tickets').select('*, units!unit_id(nama)').order('created_at', { ascending: false })
+            if (role === 'user' && profileUnitId) {
+                ticketQuery = ticketQuery.eq('unit_id', profileUnitId)
+            }
+            const { data } = await ticketQuery
             if (data) {
                 const formatted = data.map((d: any, i: number) => ({
                     id_raw: d.id,
@@ -269,9 +295,10 @@ export default function LaporanEksportPage() {
                         <select
                             value={filterUnit}
                             onChange={(e) => setFilterUnit(e.target.value)}
-                            className="w-full px-4 py-2.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                            disabled={userRole === 'user'}
+                            className="w-full px-4 py-2.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-2 focus:ring-primary/20 outline-none transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                            <option value="Semua">Semua Unit Kerja</option>
+                            {userRole !== 'user' && <option value="Semua">Semua Unit Kerja</option>}
                             {units.map(u => (
                                 <option key={u.id} value={u.id}>{u.nama}</option>
                             ))}

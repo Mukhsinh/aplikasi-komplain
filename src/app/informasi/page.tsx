@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ChevronLeft, Send, User, FileSearch, Truck, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import FormHeader from '@/components/FormHeader'
@@ -20,28 +20,45 @@ export default function InformasiPage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [ticketNumber, setTicketNumber] = useState<string | null>(null)
     const [persetujuan, setPersetujuan] = useState(false)
+    const [unitOptions, setUnitOptions] = useState<{ id: string, nama: string }[]>([])
+
+    useEffect(() => {
+        const fetchUnits = async () => {
+            const supabase = createClient()
+            const { data } = await supabase.from('units').select('id, nama').order('nama')
+            if (data) setUnitOptions(data)
+        }
+        fetchUnits()
+    }, [])
 
     const [form, setForm] = useState({
         nama: '', noIdentitas: '', kategoriPemohon: '', alamat: '', noWA: '', email: '',
-        topikInformasi: '', tujuan: '', uraianDetail: '',
+        topikInformasi: '', unitDituju: '', tujuan: '', uraianDetail: '',
         caraMemperoleh: '', metodePengiriman: '',
     })
 
     const set = (key: string, val: any) => setForm(p => ({ ...p, [key]: val }))
 
     const canProceed1 = form.nama && form.kategoriPemohon && form.noWA
-    const canProceed2 = form.topikInformasi && form.tujuan && form.uraianDetail.length >= 10
+    const canProceed2 = form.topikInformasi && form.unitDituju && form.tujuan && form.uraianDetail.length >= 10
     const canProceed3 = form.caraMemperoleh && form.metodePengiriman && persetujuan
 
     const handleSubmit = async () => {
         setIsSubmitting(true)
         const supabase = createClient()
         const trackNo = `INF-${Math.floor(10000 + Math.random() * 90000)}`
+        const unitIdValue = form.unitDituju ? form.unitDituju : null;
+        const targetUnit = unitOptions.find(u => u.id === form.unitDituju);
+        const storedUnitValue = targetUnit ? targetUnit.nama : form.unitDituju;
+
+        const payloadToSave = { ...form, unitDituju: storedUnitValue };
+
         const { error } = await supabase.from('tickets').insert({
             tracking_number: trackNo,
             jenis: 'informasi',
             status: 'Terkirim',
-            data_payload: form
+            unit_id: unitIdValue,
+            data_payload: payloadToSave
         })
         setTimeout(() => {
             setIsSubmitting(false)
@@ -115,6 +132,13 @@ export default function InformasiPage() {
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-1 block">Judul/Topik Informasi <span className="text-red-500">*</span></label>
                                 <input value={form.topikInformasi} onChange={e => set('topikInformasi', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="Contoh: Tarif Layanan, Jadwal Dokter, Data Statistik" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-600 mb-1 block">Unit Dituju <span className="text-red-500">*</span></label>
+                                <select value={form.unitDituju} onChange={e => set('unitDituju', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
+                                    <option value="" disabled>Pilih Unit Kerja...</option>
+                                    {unitOptions.map(u => <option key={u.id} value={u.id}>{u.nama}</option>)}
+                                </select>
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-2 block">Tujuan Penggunaan <span className="text-red-500">*</span></label>

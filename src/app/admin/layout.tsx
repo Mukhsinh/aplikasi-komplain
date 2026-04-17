@@ -49,49 +49,76 @@ import { createClient } from '@/utils/supabase/client'
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const [isMobileOpen, setIsMobileOpen] = useState(false)
     const [userProfile, setUserProfile] = useState<any>(null)
-    const [unreadTicketsCount, setUnreadTicketsCount] = useState(0)
+    const [notifications, setNotifications] = useState<any[]>([])
     const [isNotifOpen, setIsNotifOpen] = useState(false)
     const [appName, setAppName] = useState('PUAS')
     const pathname = usePathname()
     const router = useRouter()
 
     useEffect(() => {
-        const fetchUserData = async () => {
+        const setup = async () => {
             const supabase = createClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session?.user) return
 
-            // Fetch app name from settings
+            // 1. Fetch Profile
+            const { data: profile } = await supabase.from('profiles').select('*, units!unit_id(nama)').eq('id', session.user.id).single()
+            if (profile) setUserProfile(profile)
+
+            // 2. Fetch App Name
             const { data: settingsData } = await supabase.from('app_settings').select('setting_key, setting_value').eq('setting_key', 'app_name').single()
             if (settingsData?.setting_value) setAppName(settingsData.setting_value)
 
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session?.user) {
-                const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('*, units!unit_id(nama)')
-                    .eq('id', session.user.id)
-                    .single()
-
-                if (profileError) {
-                    console.error('Error fetching profile:', profileError)
-                    // Set fallback profile from session
-                    setUserProfile({ nama_lengkap: session.user.email, role: 'admin' })
-                } else {
-                    setUserProfile(profile)
-                }
-
-                const effectiveProfile = profile || { role: 'superadmin', unit_id: null }
-                let query = supabase.from('tickets').select('*', { count: 'exact', head: true }).neq('status', 'Selesai')
-
-                if (effectiveProfile.role !== 'superadmin' && effectiveProfile.unit_id) {
-                    query = query.eq('unit_id', effectiveProfile.unit_id)
-                }
-
-                const { count } = await query
-                setUnreadTicketsCount(count || 0)
+            // 3. Fetch Initial Notifications
+            let notifQuery = supabase.from('notifications').select('*').eq('status_baca', false).order('created_at', { ascending: false }).limit(20)
+            const effectiveProfile = profile || { role: 'user', unit_id: null }
+            if (effectiveProfile.role !== 'superadmin' && effectiveProfile.role !== 'admin' && effectiveProfile.unit_id) {
+                notifQuery = notifQuery.eq('unit_id', effectiveProfile.unit_id)
             }
+            const { data: notifData } = await notifQuery
+            setNotifications(notifData || [])
         }
-        fetchUserData()
+        setup()
     }, [])
+
+    useEffect(() => {
+        if (!userProfile) return
+        const supabase = createClient()
+
+        // 4. Subscribe to Realtime Notifications
+        const channel = supabase.channel('notifications-realtime')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload: any) => {
+                const newNotif = payload.new
+                const role = userProfile.role
+                const unitId = userProfile.unit_id
+
+                if (role === 'superadmin' || role === 'admin' || newNotif.unit_id === unitId) {
+                    setNotifications(prev => [newNotif, ...prev])
+                }
+            })
+            .subscribe()
+
+        return () => {
+            supabase.removeChannel(channel)
+        }
+    }, [userProfile])
+
+    const handleMarkAllRead = async () => {
+        const supabase = createClient()
+        const ids = notifications.map(n => n.id)
+        if (ids.length === 0) return
+        await supabase.from('notifications').update({ status_baca: true }).in('id', ids)
+        setNotifications([])
+        setIsNotifOpen(false)
+    }
+
+    const handleOpenNotification = async (notif: any) => {
+        const supabase = createClient()
+        await supabase.from('notifications').update({ status_baca: true }).eq('id', notif.id)
+        setNotifications(prev => prev.filter(n => n.id !== notif.id))
+        setIsNotifOpen(false)
+        router.push('/admin/tiket')
+    }
 
     const handleLogout = async () => {
         const supabase = createClient()
@@ -123,31 +150,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </div>
 
                 <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8">
-                    {SIDEBAR_MENUS.map((group, gIdx) => (
-                        <div key={gIdx}>
-                            <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">{group.group}</p>
-                            <nav className="space-y-1">
-                                {group.items.map((item, iIdx) => {
-                                    const isActive = pathname === item.href
-                                    return (
-                                        <Link
-                                            key={iIdx}
-                                            href={item.href}
-                                            className={cn(
-                                                "flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors",
-                                                isActive
-                                                    ? "bg-primary text-white"
-                                                    : "text-slate-400 hover:text-white hover:bg-slate-800"
-                                            )}
-                                        >
-                                            <item.icon className={cn("w-5 h-5", isActive ? "text-white" : "text-slate-500")} />
-                                            <span className="text-sm">{item.name}</span>
-                                        </Link>
-                                    )
-                                })}
-                            </nav>
-                        </div>
-                    ))}
+                    {SIDEBAR_MENUS.map((group, gIdx) => {
+                        // Protect Konfigurasi
+                        if (group.group === 'Konfigurasi' && userProfile?.role === 'user') {
+                            return null;
+                        }
+                        return (
+                            <div key={gIdx}>
+                                <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-3">{group.group}</p>
+                                <nav className="space-y-1">
+                                    {group.items.map((item, iIdx) => {
+                                        const isActive = pathname === item.href
+                                        return (
+                                            <Link
+                                                key={iIdx}
+                                                href={item.href}
+                                                className={cn(
+                                                    "flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-colors",
+                                                    isActive
+                                                        ? "bg-primary text-white"
+                                                        : "text-slate-400 hover:text-white hover:bg-slate-800"
+                                                )}
+                                            >
+                                                <item.icon className={cn("w-5 h-5", isActive ? "text-white" : "text-slate-500")} />
+                                                <span className="text-sm">{item.name}</span>
+                                            </Link>
+                                        )
+                                    })}
+                                </nav>
+                            </div>
+                        )
+                    })}
                 </div>
 
                 <div className="p-4 border-t border-slate-800 bg-slate-950/50 space-y-2">
@@ -177,27 +210,39 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             <div className="p-2 rounded-full text-slate-500 hover:bg-slate-100 transition-colors">
                                 <Bell className="w-5 h-5" />
                             </div>
-                            {unreadTicketsCount > 0 && (
-                                <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-sm ring-2 ring-white"></span>
+                            {notifications.length > 0 && (
+                                <span className="absolute top-1 right-1.5 min-w-[18px] h-[18px] bg-red-500 rounded-full animate-pulse shadow-sm ring-2 ring-white flex items-center justify-center text-[9px] font-bold text-white">{notifications.length}</span>
                             )}
 
                             {/* Dropdown Notifikasi */}
                             <div className={cn(
-                                "absolute right-0 mt-2 w-56 bg-white border border-slate-200 shadow-xl rounded-xl transition-all p-2",
+                                "absolute right-0 mt-2 w-80 bg-white border border-slate-200 shadow-xl rounded-xl transition-all",
                                 isNotifOpen ? "opacity-100 visible translate-y-0" : "opacity-0 invisible -translate-y-2"
                             )}>
-                                <p className="text-xs font-bold text-slate-700 px-2 py-1">Notifikasi</p>
-                                <div className="border-t border-slate-100 my-1 font-medium"></div>
-                                {unreadTicketsCount > 0 ? (
-                                    <Link href="/admin/tiket" className="block px-3 py-3 text-sm text-slate-600 hover:bg-slate-50 hover:text-emerald-600 font-medium rounded-lg transition-colors border border-transparent hover:border-emerald-100">
-                                        Ada <span className="font-bold text-red-500">{unreadTicketsCount} tiket</span> butuh respon
-                                    </Link>
-                                ) : (
-                                    <div className="px-3 py-4 text-xs text-slate-400 text-center flex flex-col items-center justify-center">
-                                        <Inbox className="w-5 h-5 mb-1 opacity-50" />
-                                        Tidak ada tiket baru
-                                    </div>
-                                )}
+                                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                                    <p className="text-xs font-bold text-slate-700">Notifikasi</p>
+                                    {notifications.length > 0 && (
+                                        <button onClick={handleMarkAllRead} className="text-[10px] text-primary font-bold hover:underline">Tandai Semua Dibaca</button>
+                                    )}
+                                </div>
+                                <div className="max-h-72 overflow-y-auto">
+                                    {notifications.length > 0 ? (
+                                        notifications.map((notif: any) => (
+                                            <button key={notif.id} onClick={() => handleOpenNotification(notif)} className="w-full text-left px-4 py-3 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 border-b border-slate-50 transition-colors flex items-start gap-3">
+                                                <span className="w-2 h-2 mt-1.5 bg-emerald-500 rounded-full shrink-0"></span>
+                                                <div>
+                                                    <p className="font-semibold text-xs leading-relaxed">{notif.pesan}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5">{new Date(notif.created_at).toLocaleString('id-ID')}</p>
+                                                </div>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="px-4 py-6 text-xs text-slate-400 text-center flex flex-col items-center justify-center">
+                                            <Inbox className="w-5 h-5 mb-1 opacity-50" />
+                                            Tidak ada notifikasi baru
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

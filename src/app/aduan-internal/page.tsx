@@ -57,11 +57,26 @@ export default function AduanInternalPage() {
         setIsSubmitting(true)
         const supabase = createClient()
         const trackNo = `ADI-${Math.floor(10000 + Math.random() * 90000)}`
+        const unitIdValue = form.unitDilaporkan ? form.unitDilaporkan : null;
+
+        const targetAsal = unitOptions.find(u => u.id === form.unitAsal);
+        const storedUnitAsal = targetAsal ? targetAsal.nama : form.unitAsal;
+
+        const targetDilaporkan = unitOptions.find(u => u.id === form.unitDilaporkan);
+        const storedUnitDilaporkan = targetDilaporkan ? targetDilaporkan.nama : form.unitDilaporkan;
+
+        const payloadToSave = {
+            ...form,
+            unitAsal: storedUnitAsal,
+            unitDilaporkan: storedUnitDilaporkan
+        };
+
         const { error } = await supabase.from('tickets').insert({
             tracking_number: trackNo,
             jenis: 'aduan_internal',
             status: 'Terkirim',
-            data_payload: form
+            unit_id: unitIdValue,
+            data_payload: payloadToSave
         })
         setTimeout(() => {
             setIsSubmitting(false)
@@ -109,7 +124,7 @@ export default function AduanInternalPage() {
                                     <label className="text-xs font-bold text-slate-600 mb-2 block">Unit Kerja Asal <span className="text-red-500">*</span></label>
                                     <select value={form.unitAsal} onChange={e => set('unitAsal', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all">
                                         <option value="" disabled>Pilih Unit Kerja...</option>
-                                        {unitOptions.map(u => <option key={u.id} value={u.nama}>{u.nama}</option>)}
+                                        {unitOptions.map(u => <option key={u.id} value={u.id}>{u.nama}</option>)}
                                     </select>
                                 </div>
                                 <div><label className="text-xs font-bold text-slate-600 mb-1 block">Jabatan <span className="text-slate-400">(Opsional)</span></label><input value={form.jabatan} onChange={e => set('jabatan', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all" placeholder="Jabatan Anda" /></div>
@@ -168,7 +183,7 @@ export default function AduanInternalPage() {
                                     <label className="text-xs font-bold text-slate-600 mb-1 block">Unit Kerja yang Dilaporkan</label>
                                     <select value={form.unitDilaporkan} onChange={e => set('unitDilaporkan', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all">
                                         <option value="" disabled>Pilih Unit Kerja...</option>
-                                        {unitOptions.map(u => <option key={u.id} value={u.nama}>{u.nama}</option>)}
+                                        {unitOptions.map(u => <option key={u.id} value={u.id}>{u.nama}</option>)}
                                     </select>
                                 </div>
                             </div>

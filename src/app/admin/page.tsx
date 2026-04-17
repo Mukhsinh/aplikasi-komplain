@@ -8,17 +8,33 @@ export const dynamic = 'force-dynamic'
 export default async function AdminDashboard() {
     const supabase = await createClient()
 
-    const { count: countTotal } = await supabase.from('tickets').select('*', { count: 'exact', head: true })
-    const { count: countMenunggu } = await supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'Terkirim')
-    const { count: countSelesai } = await supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'Selesai')
+    const { data: { session } } = await supabase.auth.getSession()
+    let profile = null
+    if (session) {
+        const { data } = await supabase.from('profiles').select('role, unit_id').eq('id', session.user.id).single()
+        profile = data
+    }
+
+    const applyUnitFilter = (query: any) => {
+        if (profile?.role === 'user' && profile?.unit_id) {
+            return query.eq('unit_id', profile.unit_id)
+        }
+        return query
+    }
+
+    const { count: countTotal } = await applyUnitFilter(supabase.from('tickets').select('*', { count: 'exact', head: true }))
+    const { count: countMenunggu } = await applyUnitFilter(supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'Terkirim'))
+    const { count: countSelesai } = await applyUnitFilter(supabase.from('tickets').select('*', { count: 'exact', head: true }).eq('status', 'Selesai'))
 
     // Fetch latest tickets requiring action
-    const { data: latestTickets } = await supabase
-        .from('tickets')
-        .select('*, units!unit_id(nama)')
-        .neq('status', 'Selesai')
-        .order('created_at', { ascending: false })
-        .limit(5)
+    const { data: latestTickets } = await applyUnitFilter(
+        supabase
+            .from('tickets')
+            .select('*, units!unit_id(nama)')
+            .neq('status', 'Selesai')
+            .order('created_at', { ascending: false })
+            .limit(5)
+    )
 
     const STATS = [
         { label: 'Total Tiket', value: countTotal || 0, icon: Users, color: 'from-blue-500 to-indigo-600', shadow: 'shadow-blue-500/20' },

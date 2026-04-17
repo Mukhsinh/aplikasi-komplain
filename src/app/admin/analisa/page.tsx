@@ -22,6 +22,10 @@ export default function AdminAnalisaPage() {
     const [filterUnit, setFilterUnit] = useState<string>('')
     const [filterPeriode, setFilterPeriode] = useState<string>('')
 
+    // User Profile Check
+    const [userRole, setUserRole] = useState('user')
+    const [userUnitId, setUserUnitId] = useState<string | null>(null)
+
     // Print Config
     const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10))
     const [signerName, setSignerName] = useState('Dr. Mulyadi Saputra, MARS')
@@ -39,7 +43,27 @@ export default function AdminAnalisaPage() {
 
     useEffect(() => {
         const fetchInitialData = async () => {
-            const { data: unitsData } = await supabase.from('units').select('id, nama').order('nama', { ascending: true })
+            const { data: { session } } = await supabase.auth.getSession()
+            let profileUnitId: string | null = null
+            let role = 'user'
+            if (session) {
+                const { data: profile } = await supabase.from('profiles').select('role, unit_id').eq('id', session.user.id).single()
+                if (profile) {
+                    role = profile.role
+                    setUserRole(role)
+                    if (role === 'user') {
+                        profileUnitId = profile.unit_id
+                        setUserUnitId(profile.unit_id)
+                        setFilterUnit(profile.unit_id || '')
+                    }
+                }
+            }
+
+            let unitQuery = supabase.from('units').select('id, nama').order('nama', { ascending: true })
+            if (role === 'user' && profileUnitId) {
+                unitQuery = unitQuery.eq('id', profileUnitId)
+            }
+            const { data: unitsData } = await unitQuery
             setUnits(unitsData || [])
 
             const { data: allSettings } = await supabase.from('app_settings').select('setting_key, setting_value')
@@ -56,16 +80,22 @@ export default function AdminAnalisaPage() {
                 setSignerRole(settingsMap['jabatan_penandatangan'] || 'Direktur Utama RSUD Kota Sejahtera')
             }
             initialFetchDone.current = true
-            fetchTicketsData()
+            fetchTicketsData(role, profileUnitId)
         }
         fetchInitialData()
     }, [])
 
-    const fetchTicketsData = async () => {
+    const fetchTicketsData = async (role?: string, unitId?: string | null) => {
         setIsLoading(true)
         let query = supabase.from('tickets').select('jenis, status, created_at, unit_id, units!unit_id(nama)')
 
-        if (filterUnit) {
+        // Use passed parameters if available (initial fetch), otherwise use state (subsequent fetches)
+        const effectiveRole = role ?? userRole
+        const effectiveUnitId = unitId !== undefined ? unitId : userUnitId
+
+        if (effectiveRole === 'user' && effectiveUnitId) {
+            query = query.eq('unit_id', effectiveUnitId)
+        } else if (filterUnit) {
             query = query.eq('unit_id', filterUnit)
         }
         if (filterPeriode) {
@@ -258,9 +288,10 @@ export default function AdminAnalisaPage() {
                         <select
                             value={filterUnit}
                             onChange={(e) => setFilterUnit(e.target.value)}
-                            className="px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-primary/50 flex-1"
+                            disabled={userRole === 'user'}
+                            className="px-3 py-2 border rounded-lg text-sm bg-white text-slate-900 font-semibold outline-none focus:ring-2 focus:ring-primary/50 flex-1 disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                            <option value="">Semua Unit Kerja</option>
+                            {userRole !== 'user' && <option value="">Semua Unit Kerja</option>}
                             {units.map(u => <option key={u.id} value={u.id}>{u.nama}</option>)}
                         </select>
                         <input

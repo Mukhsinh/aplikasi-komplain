@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { Inbox, Filter, Download, ArrowRight, MessageSquare, Clock, X, CheckCircle, ShieldCheck, Mail, Edit, FileText, AlertTriangle } from 'lucide-react'
+import { Inbox, Filter, Download, ArrowRight, MessageSquare, Clock, X, CheckCircle, ShieldCheck, Mail, Edit, FileText, AlertTriangle, History as HistoryIcon } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/utils/cn'
 import * as xlsx from 'xlsx'
@@ -18,12 +18,13 @@ export default function AdminTiketPage() {
     const [isGenerating, setIsGenerating] = useState(false)
     const [units, setUnits] = useState<any[]>([])
     const [profiles, setProfiles] = useState<any[]>([])
+    const [currentUser, setCurrentUser] = useState<any>(null)
+    const [ticketHistory, setTicketHistory] = useState<any[]>([])
     const [actionForm, setActionForm] = useState({
         actionType: 'respon',
         lapor_ke_role: '',
         lapor_unit_id: '',
-        eskalasi_ke_role: '',
-        eskalasi_ke_user: '',
+        eskalasi_unit_id: '',
         tembusan_unit_id: '',
         catatan: '',
         statusUpdate: '' // auto status: 'eskalasi' or 'selesai'
@@ -63,17 +64,35 @@ export default function AdminTiketPage() {
         }
 
         // Tickets
-        const { data, error } = await supabase
-            .from('tickets')
-            .select('*, units!unit_id(nama)')
-            .order('created_at', { ascending: false })
-        if (error) console.error('Error fetching tickets:', error)
-        setTickets(data || [])
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (session?.user) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('*, units!unit_id(nama)')
+                .eq('id', session.user.id)
+                .single()
+
+            const effectiveProfile = profile || { role: 'superadmin', unit_id: null }
+            setCurrentUser(effectiveProfile)
+
+            let query = supabase.from('tickets').select('*, units!unit_id(nama)').order('created_at', { ascending: false })
+
+            if (effectiveProfile.role !== 'superadmin' && effectiveProfile.role !== 'admin' && effectiveProfile.unit_id) {
+                query = query.or(`unit_id.eq.${effectiveProfile.unit_id},original_unit_id.eq.${effectiveProfile.unit_id}`)
+            }
+
+            const { data, error } = await query
+            if (error) console.error('Error fetching tickets:', error)
+            setTickets(data || [])
+        } else {
+            setTickets([])
+        }
 
         // Units & Profiles for Escalation
         const { data: unitsData } = await supabase.from('units').select('id, nama').order('nama')
         setUnits(unitsData || [])
-        const { data: profilesData } = await supabase.from('profiles').select('id, nama_lengkap, role').order('nama_lengkap')
+        const { data: profilesData } = await supabase.from('profiles').select('id, nama_lengkap, role, unit_id').order('nama_lengkap')
         setProfiles(profilesData || [])
 
         setIsLoading(false)
@@ -83,7 +102,7 @@ export default function AdminTiketPage() {
         fetchData()
     }, [])
 
-    const handleOpenDetail = (ticket: any) => {
+    const handleOpenDetail = async (ticket: any) => {
         setSelectedTicket(ticket)
         setIsDetailOpen(true)
         // Reset action form
@@ -91,12 +110,19 @@ export default function AdminTiketPage() {
             actionType: 'respon',
             lapor_ke_role: '',
             lapor_unit_id: '',
-            eskalasi_ke_role: '',
-            eskalasi_ke_user: '',
+            eskalasi_unit_id: '',
             tembusan_unit_id: '',
             catatan: '',
             statusUpdate: ''
         })
+
+        // Fetch History
+        const { data: history } = await supabase
+            .from('ticket_history')
+            .select('*, units!from_unit_id(nama)')
+            .eq('ticket_id', ticket.id)
+            .order('updated_at', { ascending: false })
+        setTicketHistory(history || [])
     }
 
     const handleExecuteAction = async () => {
@@ -122,13 +148,40 @@ export default function AdminTiketPage() {
             newStatus = 'Selesai'
         }
 
-        const { error } = await supabase.from('tickets').update({
+        // Build the update object
+        const updateObj: any = {
             data_payload: newPayload,
             status: newStatus
-        }).eq('id', selectedTicket.id);
+        }
+
+        // If escalating to another unit, update unit_id so the target sees it
+        if (actionForm.actionType === 'eskalasi' && actionForm.eskalasi_unit_id) {
+            // Preserve original unit_id for audit trail
+            if (!selectedTicket.original_unit_id) {
+                updateObj.original_unit_id = selectedTicket.unit_id
+            }
+            updateObj.unit_id = actionForm.eskalasi_unit_id
+        }
+
+        const { error } = await supabase.from('tickets').update(updateObj).eq('id', selectedTicket.id);
 
         if (!error) {
-            setActionForm({ actionType: 'respon', catatan: '', lapor_ke_role: '', lapor_unit_id: '', eskalasi_ke_role: '', eskalasi_ke_user: '', tembusan_unit_id: '', statusUpdate: '' });
+            const { error: historyError } = await supabase.from('ticket_history').insert({
+                ticket_id: selectedTicket.id,
+                from_unit_id: currentUser?.unit_id,
+                to_unit_id: actionForm.actionType === 'eskalasi' ? actionForm.eskalasi_unit_id :
+                    actionForm.actionType === 'lapor' ? actionForm.lapor_unit_id : null,
+                status: newStatus,
+                notes: actionForm.catatan || (actionForm.actionType === 'eskalasi' ? 'Tiket dieskalasikan' : 'Respon diberikan'),
+                updated_by: currentUser?.id
+            })
+
+            if (historyError) {
+                console.error('History Error:', historyError)
+                alert('Peringatan: Tiket diupdate tapi riwayat gagal dicatat: ' + historyError.message)
+            }
+
+            setActionForm({ actionType: 'respon', catatan: '', lapor_ke_role: '', lapor_unit_id: '', eskalasi_unit_id: '', tembusan_unit_id: '', statusUpdate: '' });
             fetchData();
             setIsDetailOpen(false);
             alert('Tindakan berhasil dikirim!');
@@ -429,7 +482,7 @@ export default function AdminTiketPage() {
                                 <tr><td colSpan={7} className="p-4 text-center italic">Memuat data atau data kosong...</td></tr>
                             )}
                             {tickets.map((row, index) => (
-                                <tr key={row.no}>
+                                <tr key={row.id}>
                                     <td className="border border-black p-1.5 text-center">{index + 1}</td>
                                     <td className="border border-black p-1.5 text-center font-mono">{row.tracking_number}</td>
                                     <td className="border border-black p-1.5">{new Date(row.created_at).toLocaleDateString('id-ID')}</td>
@@ -490,6 +543,32 @@ export default function AdminTiketPage() {
                             {/* Slide-over Body */}
                             <div className="flex-1 overflow-y-auto p-6">
 
+                                {/* HIGHLIGHTED ORIGINAL COMPLAINT NOTE */}
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-4 shadow-sm">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white">
+                                            <MessageSquare className="w-5 h-5" />
+                                        </div>
+                                        <h4 className="font-black text-emerald-900 text-xs uppercase tracking-widest">Catatan Original Pelapor / Pengirim</h4>
+                                    </div>
+                                    <div className="bg-white/60 p-4 rounded-xl border border-emerald-100 shadow-inner">
+                                        <p className="text-sm font-semibold text-slate-800 leading-relaxed italic">
+                                            "{selectedTicket.data_payload?.deskripsi ||
+                                                selectedTicket.data_payload?.kronologi ||
+                                                selectedTicket.data_payload?.uraian ||
+                                                selectedTicket.data_aduan?.deskripsi ||
+                                                selectedTicket.data_payload?.feedback ||
+                                                'Tidak ada catatan tertulis.'}"
+                                        </p>
+                                    </div>
+                                    {(selectedTicket.data_payload?.saran || selectedTicket.data_aduan?.harapan_pelapor) && (
+                                        <div className="mt-4 p-4 bg-white/40 rounded-xl border border-emerald-100 border-dashed">
+                                            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Harapan / Saran Perbaikan:</p>
+                                            <p className="text-xs font-medium text-slate-700">{selectedTicket.data_payload?.saran || selectedTicket.data_aduan?.harapan_pelapor}</p>
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Form Data rendering - NO unit_id shown */}
                                 <div className="space-y-4">
                                     {renderDataSection('Data Pemohon / Pelapor', selectedTicket.data_pelapor)}
@@ -499,6 +578,64 @@ export default function AdminTiketPage() {
                                     {/* Fallback if unstructured jsonb */}
                                     {selectedTicket.data_payload && renderDataSection('Informasi Form Survei', selectedTicket.data_payload)}
                                     {selectedTicket.form_data && renderDataSection('Informasi Form', selectedTicket.form_data)}
+
+                                    {/* SLA MONITORING & HISTORY */}
+                                    <div className="mt-8 pt-8 border-t border-slate-200">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="flex items-center gap-2 text-sm font-black text-slate-800 uppercase tracking-wider mb-6">
+                                                <HistoryIcon className="w-4 h-4 text-emerald-500" /> Histori Penanganan & SLA
+                                            </h4>
+                                            {(() => {
+                                                const created = new Date(selectedTicket.created_at).getTime()
+                                                const now = new Date().getTime()
+                                                const hoursDiff = (now - created) / (1000 * 60 * 60)
+                                                const isHighPriority = selectedTicket.prioritas === 'high' || selectedTicket.prioritas === 'High'
+                                                const slaLimit = isHighPriority ? 4 : 24
+                                                const isOverSLA = hoursDiff > slaLimit && selectedTicket.status !== 'Selesai'
+
+                                                return isOverSLA ? (
+                                                    <span className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-600 text-[10px] font-black uppercase tracking-tighter rounded-md border border-red-200 animate-pulse">
+                                                        <AlertTriangle className="w-3 h-3" /> Melebihi SLA ({Math.floor(hoursDiff)} Jam)
+                                                    </span>
+                                                ) : (
+                                                    <span className="flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-widest rounded-md border border-emerald-100">
+                                                        <Clock className="w-3 h-3" /> SLA Aman
+                                                    </span>
+                                                )
+                                            })()}
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {ticketHistory.length === 0 ? (
+                                                <div className="text-center py-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                                    <p className="text-xs text-slate-400 font-medium">Belum ada riwayat eskalasi atau respon unit.</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-4 relative before:absolute before:inset-0 before:left-3 before:w-0.5 before:bg-slate-100 before:z-0">
+                                                    {ticketHistory.map((h, idx) => (
+                                                        <div key={h.id} className="relative z-10 pl-8">
+                                                            <div className="absolute left-1.5 top-1 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-sm ring-4 ring-emerald-50" />
+                                                            <div className="bg-white border border-slate-100 p-3 rounded-xl shadow-sm">
+                                                                <div className="flex justify-between items-start mb-1">
+                                                                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">{h.units?.nama || 'Admin'}</span>
+                                                                    <span className="text-[9px] text-slate-400 font-bold">{new Date(h.updated_at).toLocaleString('id-ID')}</span>
+                                                                </div>
+                                                                <p className="text-xs text-slate-700 font-semibold">{h.notes}</p>
+                                                                <div className="mt-2 flex items-center gap-1.5">
+                                                                    <span className={cn(
+                                                                        "text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter",
+                                                                        h.status === 'Selesai' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                                                                    )}>
+                                                                        {h.status}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -514,59 +651,28 @@ export default function AdminTiketPage() {
                                     <motion.div key={actionForm.actionType} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="space-y-4">
 
                                         {actionForm.actionType === 'eskalasi' && (
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-4">
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Tujuan Role Eskalasi</label>
-                                                    <select value={actionForm.eskalasi_ke_role} onChange={e => setActionForm({ ...actionForm, eskalasi_ke_role: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
-                                                        <option value="" className="text-black">- Pilih Role -</option>
-                                                        <option value="user_lain" className="text-black">User Lain</option>
-                                                        <option value="supervisor" className="text-black">Supervisor</option>
-                                                        <option value="manajer" className="text-black">Manajer</option>
-                                                        <option value="direktur" className="text-black">Direktur</option>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Tujuan Eskalasi (Unit Kerja)</label>
+                                                    <select value={actionForm.eskalasi_unit_id} onChange={e => setActionForm({ ...actionForm, eskalasi_unit_id: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
+                                                        <option value="" className="text-black">- Pilih Unit Kerja Tujuan -</option>
+                                                        {units.map(u => <option key={u.id} value={u.id} className="text-black">{u.nama}</option>)}
                                                     </select>
                                                 </div>
-                                                {actionForm.eskalasi_ke_role === 'user_lain' ? (
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Pilih Pengguna</label>
-                                                        <select value={actionForm.eskalasi_ke_user} onChange={e => setActionForm({ ...actionForm, eskalasi_ke_user: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
-                                                            <option value="" className="text-black">- Pilih Pengguna -</option>
-                                                            {profiles.map(p => <option key={p.id} value={p.id} className="text-black">{p.nama_lengkap} ({p.role})</option>)}
-                                                        </select>
-                                                    </div>
-                                                ) : (
-                                                    <div>
-                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Tembusan (Unit Terkait)</label>
-                                                        <select value={actionForm.tembusan_unit_id} onChange={e => setActionForm({ ...actionForm, tembusan_unit_id: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
-                                                            <option value="" className="text-black">- Tanpa Tembusan -</option>
-                                                            {units.map(u => <option key={u.id} value={u.id} className="text-black">{u.nama}</option>)}
-                                                        </select>
-                                                    </div>
-                                                )}
-                                                {actionForm.eskalasi_ke_role === 'user_lain' && (
-                                                    <div className="col-span-2">
-                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Tembusan (Unit Terkait)</label>
-                                                        <select value={actionForm.tembusan_unit_id} onChange={e => setActionForm({ ...actionForm, tembusan_unit_id: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
-                                                            <option value="" className="text-black">- Tanpa Tembusan -</option>
-                                                            {units.map(u => <option key={u.id} value={u.id} className="text-black">{u.nama}</option>)}
-                                                        </select>
-                                                    </div>
-                                                )}
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Tembusan (Opsional)</label>
+                                                    <select value={actionForm.tembusan_unit_id} onChange={e => setActionForm({ ...actionForm, tembusan_unit_id: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
+                                                        <option value="" className="text-black">- Tanpa Tembusan -</option>
+                                                        {units.map(u => <option key={u.id} value={u.id} className="text-black">{u.nama}</option>)}
+                                                    </select>
+                                                </div>
                                             </div>
                                         )}
 
                                         {actionForm.actionType === 'lapor' && (
-                                            <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-4">
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Lapor Kepada</label>
-                                                    <select value={actionForm.lapor_ke_role} onChange={e => setActionForm({ ...actionForm, lapor_ke_role: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
-                                                        <option value="" className="text-black">- Pilih Atasan -</option>
-                                                        <option value="supervisor" className="text-black">Supervisor</option>
-                                                        <option value="manajer" className="text-black">Manajer</option>
-                                                        <option value="direktur" className="text-black">Direktur</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Unit Kerja Tujuan</label>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Unit Kerja Tujuan (Lapor Atasan)</label>
                                                     <select value={actionForm.lapor_unit_id} onChange={e => setActionForm({ ...actionForm, lapor_unit_id: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
                                                         <option value="" className="text-black">- Pilih Unit Kerja -</option>
                                                         {units.map(u => <option key={u.id} value={u.id} className="text-black">{u.nama}</option>)}

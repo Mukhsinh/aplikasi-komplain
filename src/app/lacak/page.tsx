@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, Search, CheckCircle2, Clock, MapPin, Inbox, ShieldCheck, Copy, Phone, MessageCircle, ArrowUpRight, FileText, Building2 } from 'lucide-react'
+import { ChevronLeft, Search, CheckCircle2, Clock, MapPin, Inbox, ShieldCheck, Copy, Phone, MessageCircle, ArrowUpRight, FileText, Building2, History as HistoryIcon, Download, FileDown, MessageSquareQuote, MessageSquare } from 'lucide-react'
+import { generateFormalPDF } from '@/utils/pdfExport'
 import Link from 'next/link'
 import BottomNav from '@/components/BottomNav'
 import AppFooter from '@/components/AppFooter'
@@ -32,16 +33,37 @@ function LacakContent() {
     const [trackingNumber, setTrackingNumber] = useState(initialNomor)
     const [isSearching, setIsSearching] = useState(false)
     const [result, setResult] = useState<any>(null)
+    const [history, setHistory] = useState<any[]>([])
     const [copied, setCopied] = useState(false)
     const [whatsappKontak, setWhatsappKontak] = useState('')
+    const [appSettings, setAppSettings] = useState({
+        kop_nama: '',
+        kop_rs: '',
+        kop_alamat: '',
+        kop_kontak: '',
+        nama_penandatangan: '',
+        jabatan_penandatangan: ''
+    })
 
     // Simulation: Auto search if param exists
     useEffect(() => {
         // Fetch whatsapp kontak from settings
         const fetchSettings = async () => {
             const supabase = createClient()
-            const { data } = await supabase.from('app_settings').select('setting_key, setting_value').eq('setting_key', 'whatsapp_kontak').single()
-            if (data?.setting_value) setWhatsappKontak(data.setting_value)
+            const { data } = await supabase.from('app_settings').select('setting_key, setting_value')
+            if (data) {
+                const map: any = {}
+                data.forEach(s => map[s.setting_key] = s.setting_value)
+                setWhatsappKontak(map.whatsapp_kontak || '')
+                setAppSettings({
+                    kop_nama: map.nama_instansi || 'Pemerintah Kota Pekalongan',
+                    kop_rs: map.nama_sub_instansi || 'RSUD Bendan Kota Pekalongan',
+                    kop_alamat: map.alamat_instansi || 'Jl. Sriwijaya No. 2, Pekalongan',
+                    kop_kontak: map.kontak_instansi || 'Telp: (0285) 437222',
+                    nama_penandatangan: map.nama_penandatangan || 'dr. Dwi Heri Wibawa, M.Kes',
+                    jabatan_penandatangan: map.jabatan_penandatangan || 'Direktur'
+                })
+            }
         }
         fetchSettings()
         if (initialNomor) handleSearch(undefined, initialNomor)
@@ -66,8 +88,10 @@ function LacakContent() {
 
             if (error || !data) {
                 setResult('not_found')
+                setHistory([])
             } else {
                 setResult({
+                    id: data.id,
                     nomor: data.tracking_number,
                     status: data.status,
                     jenis: data.jenis.replace('_', ' '),
@@ -78,6 +102,15 @@ function LacakContent() {
                     tindakan: data.data_payload?.tindakan_terakhir || null,
                     updated_at: data.updated_at
                 })
+
+                // Fetch Detailed History
+                const { data: historyData } = await supabase
+                    .from('ticket_history')
+                    .select('*, units!from_unit_id(nama)')
+                    .eq('ticket_id', data.id)
+                    .order('updated_at', { ascending: true })
+
+                setHistory(historyData || [])
             }
         } catch (err) {
             setResult('not_found')
@@ -106,11 +139,51 @@ function LacakContent() {
 
     const getWhatsappUrl = () => {
         if (!whatsappKontak) return '#'
-        const number = whatsappKontak.replace(/\D/g, '')
-        const text = result
-            ? `Halo, saya ingin menanyakan status tiket saya dengan nomor: ${result.nomor}`
+        const number = whatsappKontak.replace(/\D/g, '').startsWith('0') ? '62' + whatsappKontak.replace(/\D/g, '').slice(1) : whatsappKontak.replace(/\D/g, '')
+        const text = result && result !== 'not_found'
+            ? `Halo, saya ingin menanyakan status tiket saya dengan nomor: ${result.nomor}. Status saat ini: ${result.status}`
             : 'Halo, saya ingin menanyakan status tiket saya.'
         return `https://wa.me/${number}?text=${encodeURIComponent(text)}`
+    }
+
+    const handleDownloadReport = () => {
+        if (!result || result === 'not_found') return;
+
+        const tableData = [
+            ['ID Tiket', result.nomor],
+            ['Jenis Layanan', result.jenis.toUpperCase()],
+            ['Tanggal Masuk', result.tanggal],
+            ['Unit Penanggung Jawab', result.unit],
+            ['Status Akhir', result.status.toUpperCase()]
+        ];
+
+        const historyTableData = history.map((h, idx) => [
+            idx + 1,
+            new Date(h.updated_at).toLocaleString('id-ID'),
+            h.units?.nama || 'Admin/Sistem',
+            h.notes || '-'
+        ]);
+
+        generateFormalPDF({
+            title: 'LAPORAN REKAPITULASI PELACAKAN TIKET',
+            subtitle: `Nomor Tracking: ${result.nomor}`,
+            filename: `Laporan_Lacak_${result.nomor}.pdf`,
+            appSettings: {
+                kop_nama: appSettings.kop_nama,
+                kop_rs: appSettings.kop_rs,
+                kop_alamat: appSettings.kop_alamat,
+                kop_kontak: appSettings.kop_kontak
+            },
+            printDate: new Date().toISOString(),
+            signerName: appSettings.nama_penandatangan,
+            signerRole: appSettings.jabatan_penandatangan,
+            tableHeaders: ['Kategori', 'Detail Informasi'],
+            tableData: tableData,
+            additionalInfo: ['Berikut adalah rincian histori penanganan tiket Anda:', ''],
+            additionalInfoBottom: ['', 'Log Histori Penanganan:'],
+            tableHeadersBottom: ['No', 'Waktu', 'Unit Kerja', 'Catatan Penanganan'],
+            tableDataBottom: historyTableData
+        });
     }
 
     return (
@@ -366,80 +439,123 @@ function LacakContent() {
                             </div>
 
                             {/* Action Notes */}
-                            <AnimatePresence>
-                                {result.catatan && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 0.8 }}
-                                        className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden"
-                                    >
-                                        <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-5 py-3 border-b border-amber-100/60 flex items-center gap-2">
-                                            <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
-                                                <MessageCircle className="w-4 h-4 text-amber-600" />
-                                            </div>
-                                            <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">Catatan Respon Penanganan</p>
-                                        </div>
-                                        <div className="p-5">
-                                            <p className="text-sm font-medium text-black leading-relaxed">
-                                                &quot;{result.catatan}&quot;
-                                            </p>
-                                            {result.tindakan?.actionType && (
-                                                <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-wider">
-                                                    Jenis Tindakan: <span className="text-slate-600 capitalize">{result.tindakan.actionType}</span>
-                                                </p>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-
-                            {/* Last updated */}
-                            {result.updated_at && (
+                            {result.tindakan && (
                                 <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: 1 }}
-                                    className="text-center"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.8 }}
+                                    className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden"
                                 >
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                        Terakhir Diperbarui: {new Date(result.updated_at).toLocaleString('id-ID')}
-                                    </p>
+                                    <div className={cn("px-5 py-3 border-b flex items-center gap-2",
+                                        result.tindakan.actionType === 'eskalasi' ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100/60' :
+                                            result.tindakan.actionType === 'lapor' ? 'bg-gradient-to-r from-violet-50 to-purple-50 border-violet-100/60' :
+                                                result.status === 'Selesai' ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-100/60' :
+                                                    'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-100/60'
+                                    )}>
+                                        <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center",
+                                            result.tindakan.actionType === 'eskalasi' ? 'bg-blue-100' :
+                                                result.tindakan.actionType === 'lapor' ? 'bg-violet-100' :
+                                                    result.status === 'Selesai' ? 'bg-emerald-100' :
+                                                        'bg-amber-100'
+                                        )}>
+                                            {result.tindakan.actionType === 'eskalasi' ? <ArrowUpRight className="w-4 h-4 text-blue-600" /> :
+                                                result.tindakan.actionType === 'lapor' ? <ShieldCheck className="w-4 h-4 text-violet-600" /> :
+                                                    result.status === 'Selesai' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> :
+                                                        <MessageCircle className="w-4 h-4 text-amber-600" />}
+                                        </div>
+                                        <p className={cn("text-xs font-bold uppercase tracking-wide",
+                                            result.tindakan.actionType === 'eskalasi' ? 'text-blue-800' :
+                                                result.tindakan.actionType === 'lapor' ? 'text-violet-800' :
+                                                    result.status === 'Selesai' ? 'text-emerald-800' :
+                                                        'text-amber-800'
+                                        )}>
+                                            {result.tindakan.actionType === 'eskalasi' ? 'Tiket Dieskalasikan' :
+                                                result.tindakan.actionType === 'lapor' ? 'Laporan ke Atasan' :
+                                                    result.status === 'Selesai' ? 'Laporan Selesai' :
+                                                        'Catatan Petugas'}
+                                        </p>
+                                    </div>
+                                    <div className="p-5">
+                                        <p className="text-sm font-medium text-slate-700 leading-relaxed italic">
+                                            "{result.catatan || 'Petugas telah menindaklanjuti laporan Anda.'}"
+                                        </p>
+                                        <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                                                    <Building2 className="w-4 h-4 text-slate-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Unit Penanganan</p>
+                                                    <p className="text-xs font-bold text-slate-700">{result.unit}</p>
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 font-medium italic">Diperbarui {new Date(result.updated_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB</p>
+                                        </div>
+                                    </div>
                                 </motion.div>
                             )}
 
-                            {/* Action buttons */}
+                            {/* Audit Trail / History */}
+                            {history.length > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.9 }}
+                                    className="bg-white rounded-2xl shadow-lg border border-slate-100 p-5"
+                                >
+                                    <h4 className="flex items-center gap-2 text-sm font-black text-slate-800 uppercase tracking-wider mb-4">
+                                        <HistoryIcon className="w-4 h-4 text-emerald-500" /> Histori Pelayanan
+                                    </h4>
+                                    <div className="space-y-4 relative before:absolute before:inset-0 before:left-3 before:w-0.5 before:bg-slate-50 before:z-0">
+                                        {history.map((item, idx) => (
+                                            <div key={item.id} className="relative z-10 pl-8 pb-1">
+                                                <div className="absolute left-1.5 top-1.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white shadow-sm" />
+                                                <div>
+                                                    <div className="flex justify-between items-start">
+                                                        <p className="text-[11px] font-black text-indigo-600 uppercase tracking-tight">{item.units?.nama || 'Petugas'}</p>
+                                                        <p className="text-[9px] text-slate-400 font-bold">{new Date(item.updated_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                                                    </div>
+                                                    <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed">{item.notes}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {/* DOWNLOAD & NEXT ACTIONS */}
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.9 }}
-                                className="grid grid-cols-2 gap-3"
+                                transition={{ delay: 1 }}
+                                className="flex flex-col gap-4"
                             >
-                                <button
-                                    onClick={handleCopy}
-                                    className={cn(
-                                        "py-3.5 bg-white border border-slate-200 font-bold text-sm rounded-2xl transition-all hover:-translate-y-0.5 relative overflow-hidden group shadow-sm flex items-center justify-center gap-2",
-                                        copied ? "text-emerald-600 border-emerald-200 bg-emerald-50" : "text-black"
-                                    )}
-                                >
-                                    {copied ? (
-                                        <><CheckCircle2 className="w-4 h-4" /> Tersalin!</>
-                                    ) : (
-                                        <><Copy className="w-4 h-4" /> Salin Nomor</>
-                                    )}
-                                </button>
+                                <div className="flex flex-col gap-3">
+                                    <button
+                                        onClick={handleDownloadReport}
+                                        className="w-full py-4 bg-slate-900 border border-slate-800 text-white rounded-2xl font-bold shadow-lg shadow-slate-900/20 hover:bg-slate-800 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-3 relative overflow-hidden group"
+                                    >
+                                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                                        <Download className="w-5 h-5" />
+                                        Unduh Laporan
+                                    </button>
+                                </div>      {/* WhatsApp CS */}
                                 {whatsappKontak && (
                                     <a
                                         href={getWhatsappUrl()}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="py-3.5 bg-gradient-to-r from-emerald-500 to-green-500 text-white font-bold text-sm rounded-2xl transition-all hover:-translate-y-0.5 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 flex items-center justify-center gap-2"
+                                        className="w-full py-4 bg-emerald-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/10 hover:bg-emerald-600 transition-all border-b-4 border-emerald-700 active:border-b-0 active:translate-y-1"
                                     >
-                                        <Phone className="w-4 h-4" /> Hubungi WA
-                                        <ArrowUpRight className="w-3 h-3" />
+                                        <MessageSquare className="w-5 h-5" />
+                                        Hubungi CS via WhatsApp
                                     </a>
                                 )}
                             </motion.div>
+
+                            <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-wider pb-6">
+                                Terakhir Diperbarui: {new Date(result.updated_at).toLocaleString('id-ID')}
+                            </p>
                         </motion.div>
                     )}
                 </AnimatePresence>

@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Building2, Plus, Edit, Trash2, X, Save, CheckCircle2, AlertCircle, Search } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/utils/cn'
+import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function AdminUnitPage() {
     const [units, setUnits] = useState<any[]>([])
@@ -32,8 +33,19 @@ export default function AdminUnitPage() {
         setIsLoading(false)
     }
 
+    const router = useRouter()
+
     useEffect(() => {
-        fetchUnits()
+        const checkAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) return router.push('/login')
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+            if (profile?.role === 'user') {
+                return router.push('/admin/tiket')
+            }
+            fetchUnits()
+        }
+        checkAuth()
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 

@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react'
 import { Save, Bell, Clock, Building, ShieldCheck, Mail, Sliders, CheckCircle2, AlertCircle, FileText, User, Phone, MapPin, Globe, MessageCircle } from 'lucide-react'
-import { cn } from '@/utils/cn'
 import { createClient } from '@/utils/supabase/client'
+import { useRouter } from 'next/navigation'
+import { cn } from '@/utils/cn'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const DEFAULT_SETTINGS = {
@@ -68,9 +69,19 @@ export default function AdminSettingsPage() {
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
     const [isLoaded, setIsLoaded] = useState(false)
 
+    const router = useRouter()
+
     useEffect(() => {
-        const fetchSettings = async () => {
+        const fetchSettingsAndCheckAuth = async () => {
             const supabase = createClient()
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) return router.push('/login')
+
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+            if (profile?.role === 'user') {
+                return router.push('/admin/tiket')
+            }
+
             const { data } = await supabase.from('app_settings').select('*')
             if (data) {
                 // Merge database values over defaults
@@ -85,7 +96,8 @@ export default function AdminSettingsPage() {
             }
             setIsLoaded(true)
         }
-        fetchSettings()
+        fetchSettingsAndCheckAuth()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const handleChange = (key: string, value: string) => {

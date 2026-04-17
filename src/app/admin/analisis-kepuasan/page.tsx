@@ -59,10 +59,28 @@ export default function AnalisisKepuasanPage() {
                 setSignerRole(settingsMap['jabatan_penandatangan'] || 'Direktur Utama RSUD Kota Sejahtera')
             }
 
-            const { data } = await supabase.from('tickets')
+            const { data: { session } } = await supabase.auth.getSession()
+            let profileUnitId: string | null = null
+            let role = 'user'
+            if (session) {
+                const { data: profile } = await supabase.from('profiles').select('role, unit_id').eq('id', session.user.id).single()
+                if (profile) {
+                    role = profile.role
+                    if (role === 'user') {
+                        profileUnitId = profile.unit_id
+                    }
+                }
+            }
+
+            let query = supabase.from('tickets')
                 .select('*, units!unit_id(nama)')
                 .eq('jenis', 'survei')
                 .order('created_at', { ascending: false })
+
+            if (role === 'user' && profileUnitId) {
+                query = query.eq('unit_id', profileUnitId)
+            }
+            const { data } = await query
 
             if (data) {
                 setRawSurveys(data)

@@ -121,7 +121,7 @@ export default function Beranda() {
     <main className="min-h-screen pb-24 font-sans" style={{ background: 'linear-gradient(135deg, #0d9488 0%, #1e40af 40%, #be185d 100%)' }}>
 
       {/* ===== HERO HEADER ===== */}
-      <header className="relative pt-10 pb-24 px-6 overflow-hidden">
+      <header className="relative pt-6 pb-16 px-6 overflow-hidden">
         {/* Abstract SVG background shapes */}
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-[0.12]" viewBox="0 0 800 600" preserveAspectRatio="none">
           <defs>
@@ -187,7 +187,7 @@ export default function Beranda() {
       </header>
 
       {/* ===== MAIN CONTENT ===== */}
-      <section className="bg-white/95 backdrop-blur-sm rounded-t-[2.5rem] px-6 pt-8 pb-4 -mt-12 relative z-20 shadow-[0_-10px_30px_-5px_rgba(0,0,0,0.15)] min-h-[55vh]">
+      <section className="bg-white/95 backdrop-blur-sm rounded-t-[2.5rem] px-6 pt-8 pb-4 -mt-10 relative z-20 shadow-[0_-10px_30px_-5px_rgba(0,0,0,0.15)] min-h-[55vh]">
         {/* Welcome Card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -227,8 +227,24 @@ export default function Beranda() {
                   transition={{ type: 'spring', stiffness: 300 }}
                 >
                   <div className={`absolute inset-0 rounded-[1.5rem] bg-gradient-to-br ${menu.color} opacity-80 mix-blend-overlay`}></div>
-                  <div className="w-full h-full bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center p-2 border border-white/30 z-10" style={{ transformStyle: 'preserve-3d' }}>
-                    <img src={menu.img} alt={menu.title} className="w-full h-full object-contain drop-shadow-[0_10px_10px_rgba(0,0,0,0.3)] transition-transform duration-300 group-hover:scale-110 group-hover:-translate-y-2" loading="lazy" style={{ transform: 'translateZ(20px)' }} />
+                  <div className="w-full h-full bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center p-2 border border-white/20 z-0" style={{ transformStyle: 'preserve-3d' }}>
+                  </div>
+                  {/* Floating Icon */}
+                  <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none" style={{ transform: 'translateZ(50px)' }}>
+                    <motion.img
+                      src={menu.img}
+                      alt={menu.title}
+                      className="w-[110%] h-[110%] max-w-none object-contain drop-shadow-[0_20px_20px_rgba(0,0,0,0.4)]"
+                      animate={{
+                        y: [-4, 4, -4],
+                        rotate: [-2, 2, -2]
+                      }}
+                      transition={{
+                        duration: 3 + idx * 0.5,
+                        repeat: Infinity,
+                        ease: "linear"
+                      }}
+                    />
                   </div>
                 </motion.div>
                 <span className="text-xs sm:text-sm font-extrabold text-slate-700 text-center leading-tight">

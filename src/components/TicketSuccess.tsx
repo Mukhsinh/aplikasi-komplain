@@ -14,13 +14,13 @@ interface TicketSuccessProps {
 }
 
 export default function TicketSuccess({ trackingNumber, title = 'Laporan Diterima!', message = 'Data Anda telah tersimpan. Tim kami akan segera menindaklanjuti.', jenis }: TicketSuccessProps) {
-    const [csPhone, setCsPhone] = useState('1234567890')
+    const [csPhone, setCsPhone] = useState('08123456789')
     const [copied, setCopied] = useState(false)
 
     useEffect(() => {
         const fetchSettings = async () => {
             const supabase = createClient()
-            const { data } = await supabase.from('app_settings').select('setting_value').eq('setting_key', 'cs_phone').single()
+            const { data } = await supabase.from('app_settings').select('setting_value').eq('setting_key', 'whatsapp_kontak').single()
             if (data?.setting_value) setCsPhone(data.setting_value)
         }
         fetchSettings()
