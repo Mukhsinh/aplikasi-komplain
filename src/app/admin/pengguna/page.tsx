@@ -59,7 +59,7 @@ export default function AdminPenggunaPage() {
 
     const fetchProfiles = useCallback(async () => {
         setIsLoading(true)
-        const { data } = await supabase.from('profiles').select('*, units(nama)').order('created_at', { ascending: false })
+        const { data } = await supabase.from('profiles').select('*, units!unit_id(nama)').order('created_at', { ascending: false })
         setProfiles(data || [])
         setIsLoading(false)
     }, [supabase])

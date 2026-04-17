@@ -15,7 +15,7 @@ export default async function AdminDashboard() {
     // Fetch latest tickets requiring action
     const { data: latestTickets } = await supabase
         .from('tickets')
-        .select('*, units(nama)')
+        .select('*, units!unit_id(nama)')
         .neq('status', 'Selesai')
         .order('created_at', { ascending: false })
         .limit(5)

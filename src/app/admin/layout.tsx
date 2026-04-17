@@ -65,18 +65,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             const { data: { session } } = await supabase.auth.getSession()
             if (session?.user) {
-                const { data: profile } = await supabase
+                const { data: profile, error: profileError } = await supabase
                     .from('profiles')
-                    .select('*, units(nama)')
+                    .select('*, units!unit_id(nama)')
                     .eq('id', session.user.id)
                     .single()
 
-                setUserProfile(profile)
+                if (profileError) {
+                    console.error('Error fetching profile:', profileError)
+                    // Set fallback profile from session
+                    setUserProfile({ nama_lengkap: session.user.email, role: 'admin' })
+                } else {
+                    setUserProfile(profile)
+                }
 
+                const effectiveProfile = profile || { role: 'superadmin', unit_id: null }
                 let query = supabase.from('tickets').select('*', { count: 'exact', head: true }).neq('status', 'Selesai')
 
-                if (profile?.role !== 'superadmin' && profile?.unit_id) {
-                    query = query.eq('unit_tujuan', profile.unit_id)
+                if (effectiveProfile.role !== 'superadmin' && effectiveProfile.unit_id) {
+                    query = query.eq('unit_id', effectiveProfile.unit_id)
                 }
 
                 const { count } = await query

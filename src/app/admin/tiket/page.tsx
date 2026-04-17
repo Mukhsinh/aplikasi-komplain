@@ -26,27 +26,30 @@ export default function AdminTiketPage() {
     const fetchData = async () => {
         setIsLoading(true)
 
-        // Settings
-        const { data: settingsData } = await supabase.from('app_settings').select('*').limit(1).single()
-        if (settingsData) {
+        // Settings - fetch as key-value pairs
+        const { data: allSettings } = await supabase.from('app_settings').select('setting_key, setting_value')
+        if (allSettings) {
+            const settingsMap: Record<string, string> = {}
+            allSettings.forEach((s: any) => { settingsMap[s.setting_key] = s.setting_value })
             setAppSettings({
-                kop_nama: settingsData.nama_instansi || 'Pemerintah Kota Sejahtera',
-                kop_rs: settingsData.nama_sub_instansi || 'Rumah Sakit Umum Daerah',
-                kop_alamat: settingsData.alamat_instansi || 'Jl. Jend. Sudirman No. 123',
-                kop_kontak: settingsData.kontak_instansi || 'Telp/Email'
+                kop_nama: settingsMap['nama_instansi'] || 'Pemerintah Kota Sejahtera',
+                kop_rs: settingsMap['nama_sub_instansi'] || 'Rumah Sakit Umum Daerah',
+                kop_alamat: settingsMap['alamat_instansi'] || 'Jl. Jend. Sudirman No. 123',
+                kop_kontak: settingsMap['kontak_instansi'] || 'Telp/Email'
             })
-            setSignerName(settingsData.nama_penandatangan || 'Dr. Mulyadi Saputra, MARS')
-            setSignerRole(settingsData.jabatan_penandatangan || 'Direktur Utama RSUD Kota Sejahtera')
+            setSignerName(settingsMap['nama_penandatangan'] || 'Dr. Mulyadi Saputra, MARS')
+            setSignerRole(settingsMap['jabatan_penandatangan'] || 'Direktur Utama RSUD Kota Sejahtera')
         } else {
             setSignerName('Dr. Mulyadi Saputra, MARS')
             setSignerRole('Direktur Utama RSUD Kota Sejahtera')
         }
 
         // Tickets
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('tickets')
-            .select('*, units(nama)')
+            .select('*, units!unit_id(nama)')
             .order('created_at', { ascending: false })
+        if (error) console.error('Error fetching tickets:', error)
         setTickets(data || [])
         setIsLoading(false)
     }

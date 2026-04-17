@@ -29,24 +29,26 @@ export default function LaporanEksportPage() {
             const { data: unitsData } = await supabase.from('units').select('id, nama').order('nama')
             if (unitsData) setUnits(unitsData)
 
-            // 2. Fetch app settings (using single object if available, otherwise fallback)
-            const { data: settingsData } = await supabase.from('app_settings').select('*').limit(1).single()
-            if (settingsData) {
+            // 2. Fetch app settings (key-value pairs)
+            const { data: allSettings } = await supabase.from('app_settings').select('setting_key, setting_value')
+            if (allSettings) {
+                const settingsMap: Record<string, string> = {}
+                allSettings.forEach((s: any) => { settingsMap[s.setting_key] = s.setting_value })
                 setAppSettings({
-                    kop_nama: settingsData.nama_instansi || 'Pemerintah Kota Sejahtera',
-                    kop_rs: settingsData.nama_sub_instansi || 'Rumah Sakit Umum Daerah',
-                    kop_alamat: settingsData.alamat_instansi || 'Jl. Jend. Sudirman No. 123',
-                    kop_kontak: settingsData.kontak_instansi || 'Telp/Email'
+                    kop_nama: settingsMap['nama_instansi'] || 'Pemerintah Kota Sejahtera',
+                    kop_rs: settingsMap['nama_sub_instansi'] || 'Rumah Sakit Umum Daerah',
+                    kop_alamat: settingsMap['alamat_instansi'] || 'Jl. Jend. Sudirman No. 123',
+                    kop_kontak: settingsMap['kontak_instansi'] || 'Telp/Email'
                 })
-                setSignerName(settingsData.nama_penandatangan || 'Dr. Mulyadi Saputra, MARS')
-                setSignerRole(settingsData.jabatan_penandatangan || 'Direktur Utama RSUD Kota Sejahtera')
+                setSignerName(settingsMap['nama_penandatangan'] || 'Dr. Mulyadi Saputra, MARS')
+                setSignerRole(settingsMap['jabatan_penandatangan'] || 'Direktur Utama RSUD Kota Sejahtera')
             } else {
                 setSignerName('Dr. Mulyadi Saputra, MARS')
                 setSignerRole('Direktur Utama RSUD Kota Sejahtera')
             }
 
             // 3. Fetch all tickets
-            const { data } = await supabase.from('tickets').select('*, units(nama)').order('created_at', { ascending: false })
+            const { data } = await supabase.from('tickets').select('*, units!unit_id(nama)').order('created_at', { ascending: false })
             if (data) {
                 const formatted = data.map((d: any, i: number) => ({
                     id_raw: d.id,
