@@ -83,22 +83,22 @@ export default function InformasiPage() {
                                 <div><h3 className="font-bold text-slate-800 text-sm">I. Identitas Pemohon (Siapa)</h3><p className="text-[10px] text-slate-500 font-semibold">Untuk validasi dan pengiriman informasi</p></div>
                             </div>
                             <div className="space-y-4">
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Nama Lengkap <span className="text-red-500">*</span></label><input value={form.nama} onChange={e => set('nama', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="Nama pemohon" /></div>
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">No. Identitas (KTP/SIM/Paspor)</label><input value={form.noIdentitas} onChange={e => set('noIdentitas', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="Opsional" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Nama Lengkap <span className="text-red-500">*</span></label><input value={form.nama} onChange={e => set('nama', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="Nama pemohon" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">No. Identitas (KTP/SIM/Paspor)</label><input value={form.noIdentitas} onChange={e => set('noIdentitas', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="Opsional" /></div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-600 mb-2 block">Kategori Pemohon <span className="text-red-500">*</span></label>
                                     <div className="grid grid-cols-1 gap-2">
                                         {KATEGORI_PEMOHON.map(opt => (
-                                            <label key={opt} className={cn("flex items-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium", form.kategoriPemohon === opt ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500/20" : "border-slate-200 hover:bg-slate-50")}>
+                                            <label key={opt} className={cn("flex items-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium text-slate-800", form.kategoriPemohon === opt ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500/20" : "border-slate-200 hover:bg-slate-50")}>
                                                 <input type="radio" className="hidden" checked={form.kategoriPemohon === opt} onChange={() => set('kategoriPemohon', opt)} /><span>{opt}</span>{form.kategoriPemohon === opt && <span className="ml-auto text-blue-500 font-bold">✓</span>}
                                             </label>
                                         ))}
                                     </div>
                                 </div>
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Alamat Korespondensi</label><input value={form.alamat} onChange={e => set('alamat', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="Alamat lengkap" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Alamat Korespondensi</label><input value={form.alamat} onChange={e => set('alamat', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="Alamat lengkap" /></div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">No. WhatsApp / Telepon <span className="text-red-500">*</span></label><input value={form.noWA} onChange={e => set('noWA', e.target.value)} type="tel" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="08xxxxxxxxxx" /></div>
-                                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Email</label><input value={form.email} onChange={e => set('email', e.target.value)} type="email" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="user@mail.com" /></div>
+                                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">No. WhatsApp / Telepon <span className="text-red-500">*</span></label><input value={form.noWA} onChange={e => set('noWA', e.target.value)} type="tel" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="08xxxxxxxxxx" /></div>
+                                    <div><label className="text-xs font-bold text-slate-600 mb-1 block">Email</label><input value={form.email} onChange={e => set('email', e.target.value)} type="email" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="user@mail.com" /></div>
                                 </div>
                             </div>
                             <button type="button" onClick={() => setStep(2)} disabled={!canProceed1} className="mt-6 w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold disabled:opacity-50 transition-all hover:bg-slate-800">Lanjutkan &rarr;</button>
@@ -114,13 +114,13 @@ export default function InformasiPage() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-1 block">Judul/Topik Informasi <span className="text-red-500">*</span></label>
-                                <input value={form.topikInformasi} onChange={e => set('topikInformasi', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="Contoh: Tarif Layanan, Jadwal Dokter, Data Statistik" />
+                                <input value={form.topikInformasi} onChange={e => set('topikInformasi', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="Contoh: Tarif Layanan, Jadwal Dokter, Data Statistik" />
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-2 block">Tujuan Penggunaan <span className="text-red-500">*</span></label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {TUJUAN_INFORMASI.map(opt => (
-                                        <label key={opt} className={cn("flex items-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium", form.tujuan === opt ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500/20" : "border-slate-200 hover:bg-slate-50")}>
+                                        <label key={opt} className={cn("flex items-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium text-slate-800", form.tujuan === opt ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500/20" : "border-slate-200 hover:bg-slate-50")}>
                                             <input type="radio" className="hidden" checked={form.tujuan === opt} onChange={() => set('tujuan', opt)} /><span>{opt}</span>
                                         </label>
                                     ))}
@@ -128,7 +128,7 @@ export default function InformasiPage() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-2 block">Uraian Detail Informasi <span className="text-red-500">*</span></label>
-                                <textarea value={form.uraianDetail} onChange={e => set('uraianDetail', e.target.value)} rows={5} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none" placeholder="Berikan deskripsi spesifik agar tim kami dapat menyediakan data yang tepat..." />
+                                <textarea value={form.uraianDetail} onChange={e => set('uraianDetail', e.target.value)} rows={5} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none" placeholder="Berikan deskripsi spesifik agar tim kami dapat menyediakan data yang tepat..." />
                             </div>
                             <div className="flex gap-3 mt-6">
                                 <button type="button" onClick={() => setStep(1)} className="px-5 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50"><ChevronLeft className="w-5 h-5" /></button>
@@ -148,7 +148,7 @@ export default function InformasiPage() {
                                 <label className="text-xs font-bold text-slate-600 mb-2 block">Cara Memperoleh Informasi <span className="text-red-500">*</span></label>
                                 <div className="grid grid-cols-1 gap-2">
                                     {CARA_MEMPEROLEH.map(opt => (
-                                        <label key={opt} className={cn("flex items-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium", form.caraMemperoleh === opt ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500/20" : "border-slate-200 hover:bg-slate-50")}>
+                                        <label key={opt} className={cn("flex items-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium text-slate-800", form.caraMemperoleh === opt ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500/20" : "border-slate-200 hover:bg-slate-50")}>
                                             <input type="radio" className="hidden" checked={form.caraMemperoleh === opt} onChange={() => set('caraMemperoleh', opt)} /><span>{opt}</span>
                                         </label>
                                     ))}

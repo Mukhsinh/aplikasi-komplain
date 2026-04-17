@@ -116,14 +116,14 @@ export default function KomplainPage() {
                                 <div><h3 className="font-bold text-slate-800 text-sm">I. Data Pelapor (Siapa)</h3><p className="text-[10px] text-slate-500 font-semibold">Penting untuk verifikasi dan tindak lanjut</p></div>
                             </div>
                             <div className="space-y-4">
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Nama Lengkap <span className="text-red-500">*</span></label><input value={form.nama} onChange={e => set('nama', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="Nama pelapor" /></div>
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">No. Rekam Medis <span className="text-slate-400">(Jika Pasien)</span></label><input value={form.noRM} onChange={e => set('noRM', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="Opsional" /></div>
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">No. HP / WhatsApp <span className="text-red-500">*</span></label><input value={form.noHP} onChange={e => set('noHP', e.target.value)} type="tel" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="08xxxxxxxxxx" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Nama Lengkap <span className="text-red-500">*</span></label><input value={form.nama} onChange={e => set('nama', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="Nama pelapor" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">No. Rekam Medis <span className="text-slate-400">(Jika Pasien)</span></label><input value={form.noRM} onChange={e => set('noRM', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="Opsional" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">No. HP / WhatsApp <span className="text-red-500">*</span></label><input value={form.noHP} onChange={e => set('noHP', e.target.value)} type="tel" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="08xxxxxxxxxx" /></div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-600 mb-2 block">Hubungan Pelapor <span className="text-red-500">*</span></label>
                                     <div className="grid grid-cols-1 gap-2">
                                         {HUBUNGAN_OPTIONS.map(opt => (
-                                            <label key={opt} className={cn("flex items-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium", form.hubungan === opt ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-slate-200 hover:bg-slate-50")}>
+                                            <label key={opt} className={cn("flex items-center p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium text-slate-800", form.hubungan === opt ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-slate-200 hover:bg-slate-50")}>
                                                 <input type="radio" className="hidden" checked={form.hubungan === opt} onChange={() => set('hubungan', opt)} /><span>{opt}</span>{form.hubungan === opt && <span className="ml-auto text-primary font-bold">✓</span>}
                                             </label>
                                         ))}
@@ -142,17 +142,17 @@ export default function KomplainPage() {
                                 <div><h3 className="font-bold text-slate-800 text-sm">II. Lokasi & Waktu Kejadian</h3><p className="text-[10px] text-slate-500 font-semibold">Untuk memetakan unit kerja yang dievaluasi</p></div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Tanggal Kejadian <span className="text-red-500">*</span></label><input type="date" value={form.tglKejadian} onChange={e => set('tglKejadian', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" /></div>
-                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Jam Kejadian (WIB)</label><input type="time" value={form.jamKejadian} onChange={e => set('jamKejadian', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Tanggal Kejadian <span className="text-red-500">*</span></label><input type="date" value={form.tglKejadian} onChange={e => set('tglKejadian', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" /></div>
+                                <div><label className="text-xs font-bold text-slate-600 mb-1 block">Jam Kejadian (WIB)</label><input type="time" value={form.jamKejadian} onChange={e => set('jamKejadian', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" /></div>
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-2 block">Unit / Lokasi yang Dikeluhkan <span className="text-red-500">*</span></label>
-                                <select value={form.unitLokasi} onChange={e => set('unitLokasi', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                                <select value={form.unitLokasi} onChange={e => set('unitLokasi', e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                                     <option value="" disabled>Pilih Unit Kerja...</option>
                                     {unitOptions.map(u => <option key={u.id} value={u.nama}>{u.nama}</option>)}
                                     <option value="Lainnya">Lainnya</option>
                                 </select>
-                                {form.unitLokasi === 'Lainnya' && <input value={form.unitLokasiLain} onChange={e => set('unitLokasiLain', e.target.value)} className="mt-2 w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold !text-slate-900 outline-none focus:ring-2 focus:ring-primary/20" placeholder="Sebutkan lokasi..." />}
+                                {form.unitLokasi === 'Lainnya' && <input value={form.unitLokasiLain} onChange={e => set('unitLokasiLain', e.target.value)} className="mt-2 w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20" placeholder="Sebutkan lokasi..." />}
                             </div>
                             <div className="flex gap-3 mt-6">
                                 <button type="button" onClick={() => setStep(1)} className="px-5 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50"><ChevronLeft className="w-5 h-5" /></button>
@@ -170,7 +170,7 @@ export default function KomplainPage() {
                             </div>
                             <div className="space-y-3">
                                 {KATEGORI_KOMPLAIN.map(k => (
-                                    <label key={k.value} className={cn("flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-all", form.kategori.includes(k.value) ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-slate-200 hover:bg-slate-50")}>
+                                    <label key={k.value} className={cn("flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-all text-slate-800", form.kategori.includes(k.value) ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-slate-200 hover:bg-slate-50")}>
                                         <input type="checkbox" className="mt-0.5 accent-emerald-600 w-4 h-4" checked={form.kategori.includes(k.value)} onChange={() => toggleArr('kategori', k.value)} />
                                         <div><p className="text-sm font-bold text-slate-700">{k.label}</p><p className="text-xs text-slate-500 mt-0.5">{k.desc}</p></div>
                                     </label>
@@ -193,7 +193,7 @@ export default function KomplainPage() {
                             <div>
                                 <label className="text-xs font-bold text-slate-600 mb-2 block">Detail Kejadian <span className="text-red-500">*</span></label>
                                 <p className="text-xs text-slate-500 mb-3">Sebutkan nama petugas jika ingat, atau poin utama masalahnya. Min 20 karakter.</p>
-                                <textarea value={form.detailKejadian} onChange={e => set('detailKejadian', e.target.value)} rows={5} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none !text-slate-900" placeholder="Ceritakan kronologi..." />
+                                <textarea value={form.detailKejadian} onChange={e => set('detailKejadian', e.target.value)} rows={5} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none text-slate-900" placeholder="Ceritakan kronologi..." />
                                 <p className="text-[10px] text-slate-400 mt-1 text-right">{form.detailKejadian.length} karakter</p>
                             </div>
                             <div className="flex gap-3 mt-6">
@@ -212,11 +212,11 @@ export default function KomplainPage() {
                             </div>
                             <div className="space-y-2">
                                 {HARAPAN_OPTIONS.map(opt => (
-                                    <label key={opt} className={cn("flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium", form.harapan.includes(opt) ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-slate-200 hover:bg-slate-50")}>
+                                    <label key={opt} className={cn("flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all text-sm font-medium text-slate-800", form.harapan.includes(opt) ? "border-primary bg-primary/5 ring-1 ring-primary/20" : "border-slate-200 hover:bg-slate-50")}>
                                         <input type="checkbox" className="accent-emerald-600 w-4 h-4" checked={form.harapan.includes(opt)} onChange={() => toggleArr('harapan', opt)} /><span>{opt}</span>
                                     </label>
                                 ))}
-                                {form.harapan.includes('Lainnya') && <input value={form.harapanLain} onChange={e => set('harapanLain', e.target.value)} className="mt-2 w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 !text-slate-900" placeholder="Sebutkan harapan Anda..." />}
+                                {form.harapan.includes('Lainnya') && <input value={form.harapanLain} onChange={e => set('harapanLain', e.target.value)} className="mt-2 w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 text-slate-900" placeholder="Sebutkan harapan Anda..." />}
                             </div>
                             <div className="flex gap-3 mt-6">
                                 <button type="button" onClick={() => setStep(4)} className="px-5 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50"><ChevronLeft className="w-5 h-5" /></button>
