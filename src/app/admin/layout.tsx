@@ -51,7 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const [userProfile, setUserProfile] = useState<any>(null)
     const [unreadTicketsCount, setUnreadTicketsCount] = useState(0)
     const [isNotifOpen, setIsNotifOpen] = useState(false)
-    const [appName, setAppName] = useState('KASIH')
+    const [appName, setAppName] = useState('PUAS')
     const pathname = usePathname()
     const router = useRouter()
 

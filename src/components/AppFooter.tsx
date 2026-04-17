@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
 export default function AppFooter() {
-    const [appName, setAppName] = useState('KASIH')
+    const [appName, setAppName] = useState('PUAS')
     const [footerText, setFooterText] = useState('')
 
     useEffect(() => {

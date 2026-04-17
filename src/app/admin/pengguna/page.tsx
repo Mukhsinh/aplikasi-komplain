@@ -111,43 +111,43 @@ export default function AdminPenggunaPage() {
 
         setIsSaving(true)
         try {
-            // 1. Create auth user via Supabase Auth signUp
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: addFormData.email,
-                password: addFormData.password,
-                options: {
-                    data: {
-                        role: addFormData.role,
-                        full_name: addFormData.nama_lengkap
-                    }
-                }
-            })
-
-            if (authError) {
-                showToast('error', authError.message)
+            // Get current session token for authorization
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session) {
+                showToast('error', 'Sesi telah berakhir. Silakan login ulang.')
                 setIsSaving(false)
                 return
             }
 
-            if (authData.user) {
-                // 2. Create/update profile in profiles table
-                const { error: profileError } = await supabase.from('profiles').upsert({
-                    id: authData.user.id,
-                    nama_lengkap: addFormData.nama_lengkap,
-                    email: addFormData.email,
-                    role: addFormData.role,
-                    unit_id: addFormData.unit_id || null,
-                    is_active: true
-                }, { onConflict: 'id' })
-
-                if (profileError) {
-                    showToast('error', 'Auth berhasil, tapi profil gagal: ' + profileError.message)
-                } else {
-                    showToast('success', `Pengguna "${addFormData.nama_lengkap}" berhasil dibuat!`)
-                    setAddFormData({ nama_lengkap: '', email: '', password: '', role: 'staf', unit_id: '' })
-                    setIsAddModalOpen(false)
-                    fetchProfiles()
+            // Call edge function to create user (avoids logging out current admin)
+            const response = await fetch(
+                `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/admin-create-user`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+                    },
+                    body: JSON.stringify({
+                        email: addFormData.email,
+                        password: addFormData.password,
+                        nama_lengkap: addFormData.nama_lengkap,
+                        role: addFormData.role,
+                        unit_id: addFormData.unit_id || null
+                    })
                 }
+            )
+
+            const result = await response.json()
+
+            if (!response.ok || result.error) {
+                showToast('error', result.error || 'Gagal membuat pengguna')
+            } else {
+                showToast('success', `Pengguna "${addFormData.nama_lengkap}" berhasil dibuat!`)
+                setAddFormData({ nama_lengkap: '', email: '', password: '', role: 'staf', unit_id: '' })
+                setIsAddModalOpen(false)
+                fetchProfiles()
             }
         } catch (err: any) {
             showToast('error', 'Error: ' + (err.message || 'Unknown'))
@@ -361,7 +361,7 @@ export default function AdminPenggunaPage() {
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Hak Akses</label>
                                         <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 transition-all">
-                                            <option value="staf">Staf</option><option value="admin">Admin</option><option value="superadmin">Superadmin</option>
+                                            <option value="staf">Staf</option><option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Superadmin</option>
                                         </select>
                                     </div>
                                     <div>
@@ -466,7 +466,7 @@ export default function AdminPenggunaPage() {
                                         </label>
                                         <select value={addFormData.role} onChange={e => setAddFormData({ ...addFormData, role: e.target.value })}
                                             className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all">
-                                            <option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Superadmin</option>
+                                            <option value="staf">Staf</option><option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Superadmin</option>
                                         </select>
                                     </div>
                                     <div>

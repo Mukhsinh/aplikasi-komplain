@@ -8,7 +8,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'KASIH - Kanal Aduan, Survey dan Informasi',
+  title: 'PUAS - Kanal Aduan, Survey dan Informasi',
   description: 'Aplikasi Manajemen Layanan Cepat dan Modern',
 }
 

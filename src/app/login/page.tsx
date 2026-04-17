@@ -9,7 +9,7 @@ import { createClient } from '@/utils/supabase/client'
 
 export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false)
-    const [appName, setAppName] = useState('KASIH')
+    const [appName, setAppName] = useState('PUAS')
 
     useEffect(() => {
         const fetchAppName = async () => {

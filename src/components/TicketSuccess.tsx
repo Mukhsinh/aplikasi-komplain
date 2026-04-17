@@ -37,7 +37,7 @@ export default function TicketSuccess({ trackingNumber, title = 'Laporan Diterim
         const content = `
 ========================================
         TANDA TERIMA LAPORAN
-        KASIH - KANAL ADUAN, SURVEI,
+        PUAS - KANAL ADUAN, SURVEI,
         INFORMASI INTERAKTIF
 ========================================
 
@@ -52,7 +52,7 @@ Status          : Baru (Menunggu Proses)
 
 Gunakan nomor tiket di atas untuk
 melacak progres laporan Anda melalui
-menu "Lacak Tiket" pada aplikasi KASIH.
+menu "Lacak Tiket" pada aplikasi PUAS.
 
 Kontak Customer Service:
 📞 ${csPhone}

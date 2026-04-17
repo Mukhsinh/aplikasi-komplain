@@ -17,7 +17,7 @@ const MENUS = [
 ]
 
 const FAQS = [
-  { q: "Apa itu layanan KASIH?", a: "KASIH (Kanal Aduan, Survey, dan Informasi) adalah platform terintegrasi untuk memudahkan pasien dan masyarakat dalam menyampaikan keluhan, mengisi survei, dan meminta informasi secara transparan dan terpadu." },
+  { q: "Apa itu layanan PUAS?", a: "PUAS (Kanal Aduan, Survey, dan Informasi) adalah platform terintegrasi untuk memudahkan pasien dan masyarakat dalam menyampaikan keluhan, mengisi survei, dan meminta informasi secara transparan dan terpadu." },
   { q: "Bagaimana cara mengajukan komplain?", a: "Pilih menu 'Komplain Pasien' di beranda, lalu isi formulir dengan identitas Anda, kronologi kejadian, dan bukti pendukung. Laporan Anda akan menerima tiket untuk dilacak." },
   { q: "Bagaimana cara mengisi survei kepuasan?", a: "Pilih menu 'Survei' di beranda, lalu pilih poli atau layanan yang Anda kunjungi dan jawab pertanyaan sesuai dengan pengalaman Anda saat menerima pelayanan." },
   { q: "Bagaimana cara meminta informasi?", a: "Pilih menu 'Informasi', lengkapi formulir permohonan dengan detail informasi yang diinginkan. Tim kami akan mengevaluasi dan merespon secepatnya." },
@@ -45,7 +45,7 @@ function timeAgo(dateString: string) {
 const TESTIMONIALS = [
   { name: "Budi Santoso", text: "Pelayanan sangat memuaskan dan cepat tanggap. Dokter dan perawat sangat ramah.", rating: 5, time: "2 hari yang lalu" },
   { name: "Siti Aminah", text: "Fasilitas rumah sakit bersih dan nyaman. Proses pendaftaran juga sangat mudah melalui aplikasi ini.", rating: 5, time: "1 minggu yang lalu" },
-  { name: "Andi Wijaya", text: "Terima kasih atas pelayanannya. Keluhan saya ditangani dengan cepat melalui sistem portal informasi KASIH.", rating: 4, time: "3 minggu yang lalu" },
+  { name: "Andi Wijaya", text: "Terima kasih atas pelayanannya. Keluhan saya ditangani dengan cepat melalui sistem portal informasi PUAS.", rating: 4, time: "3 minggu yang lalu" },
   { name: "Rina Kusuma", text: "Sangat terbantu dengan adanya sistem informasi otomatis ini. Sukses terus untuk rumah sakit!", rating: 5, time: "1 bulan yang lalu" },
   { name: "Hendra Gunawan", text: "Respons dari customer service sangat cepat dan informatif. Mantap pelayanannya sangat profesional.", rating: 5, time: "1 bulan yang lalu" },
 ]
@@ -63,7 +63,7 @@ function speak(text: string) {
 }
 
 export default function Beranda() {
-  const [appName, setAppName] = useState('KASIH')
+  const [appName, setAppName] = useState('PUAS')
   const [appLogo, setAppLogo] = useState('')
   const [namaInstansi, setNamaInstansi] = useState('')
   const [openFAQ, setOpenFAQ] = useState<number | null>(null)
@@ -153,12 +153,12 @@ export default function Beranda() {
               <img src={appLogo} alt="Logo" className="w-12 h-12 rounded-xl shadow-lg object-cover border-2 border-white/30" />
             ) : (
               <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md border-2 border-white/30 flex items-center justify-center shadow-lg">
-                <span className="text-xl font-black text-white">K</span>
+                <span className="text-xl font-black text-white">P</span>
               </div>
             )}
             <div>
               <h1 className="text-2xl font-black text-white tracking-wide leading-none drop-shadow-lg" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif", letterSpacing: '0.1em' }}>
-                KASIH
+                PUAS
               </h1>
               <p className="text-[9px] sm:text-xs font-bold text-white/80 uppercase tracking-widest mt-1">
                 Kanal Aduan, Survey dan Informasi Integratif
