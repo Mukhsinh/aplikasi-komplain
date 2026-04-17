@@ -6,6 +6,7 @@ import * as xlsx from 'xlsx'
 import { createClient } from '@/utils/supabase/client'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts'
 import { motion } from 'framer-motion'
+import { generateFormalPDF } from '@/utils/pdfExport'
 
 export default function LaporanEksportPage() {
     const [isGenerating, setIsGenerating] = useState(false)
@@ -106,11 +107,21 @@ export default function LaporanEksportPage() {
         total: categoryGroup[k]
     }))
 
+    // RANKING DATA (By total tickets)
+    const unitRankingGroup = filteredData.reduce((acc, curr) => {
+        acc[curr.unit] = (acc[curr.unit] || 0) + 1
+        return acc
+    }, {} as Record<string, number>)
+
+    const rankingData = Object.keys(unitRankingGroup)
+        .map(k => ({ name: k, total: unitRankingGroup[k] }))
+        .sort((a, b) => b.total - a.total)
+
     const handleExportExcel = () => {
         setIsGenerating(true)
         setTimeout(() => {
             try {
-                const worksheet = xlsx.utils.json_to_sheet(filteredData.map(e => ({
+                const worksheetData = filteredData.map(e => ({
                     No: e.no,
                     'ID Tiket': e.id_tiket,
                     Tanggal: e.tanggal,
@@ -118,10 +129,45 @@ export default function LaporanEksportPage() {
                     Kategori: e.kategori,
                     Unit: e.unit,
                     Status: e.status
-                })))
+                }))
+
+                const rankingSheetData = rankingData.map((r, i) => ({
+                    'Peringkat': i + 1,
+                    'Unit Kerja': r.name,
+                    'Total Tiket': r.total
+                }))
+
+                const worksheet = xlsx.utils.json_to_sheet([])
+
+                xlsx.utils.sheet_add_aoa(worksheet, [
+                    [appSettings.kop_nama.toUpperCase()],
+                    [appSettings.kop_rs.toUpperCase()],
+                    [`${appSettings.kop_alamat} | ${appSettings.kop_kontak}`],
+                    [],
+                    ['LAPORAN REKAPITULASI LAYANAN DAN KOMPLAIN (KOMPREHENSIF)'],
+                    [`Tanggal Cetak: ${new Date(printDate).toLocaleDateString('id-ID')}`],
+                    [`Penanggung Jawab: ${signerName} (${signerRole})`],
+                    [`Periode: ${dateRange.start ? `${dateRange.start} s/d ${dateRange.end || 'Sekarang'}` : 'Seluruh Riwayat'}`],
+                    [`Filter Unit: ${filterUnit === 'Semua' ? 'Keseluruhan' : units.find(u => u.id === filterUnit)?.nama || filterUnit}`],
+                    [`Filter Kategori: ${filterJenis}`],
+                    [],
+                    [`Rangkuman KPI: Total ${totalCount} Data | Selesai ${selesaiCount} | Survei ${surveiCount} | Pengaduan ${pengaduanCount}`],
+                    [],
+                    ['A. Ranking Unit Kerja Berdasarkan Volume Aduan']
+                ], { origin: 'A1' })
+
+                xlsx.utils.sheet_add_json(worksheet, rankingSheetData, { origin: 'A16' })
+
+                xlsx.utils.sheet_add_aoa(worksheet, [
+                    [''],
+                    ['B. Tabulasi Detail Rekapitulasi Data']
+                ], { origin: `A${17 + rankingSheetData.length}` })
+
+                xlsx.utils.sheet_add_json(worksheet, worksheetData, { origin: `A${20 + rankingSheetData.length}` })
+
                 const workbook = xlsx.utils.book_new()
-                xlsx.utils.book_append_sheet(workbook, worksheet, "Laporan_Tiket")
-                xlsx.writeFile(workbook, `Laporan_PUAS_${new Date().toISOString().slice(0, 10)}.xlsx`)
+                xlsx.utils.book_append_sheet(workbook, worksheet, "Laporan_Komprehensif")
+                xlsx.writeFile(workbook, `Laporan_PUAS_Komprehensif_${new Date().toISOString().slice(0, 10)}.xlsx`)
             } catch (error) {
                 console.error("XLSX export failed:", error)
                 alert("Gagal melakukan ekspor.")
@@ -130,8 +176,54 @@ export default function LaporanEksportPage() {
         }, 1000)
     }
 
-    const handlePrintPDF = () => {
-        window.print()
+    const handleExportPDF = () => {
+        setIsGenerating(true)
+        setTimeout(() => {
+            // First table: ranking
+            const rankHeaders = ['Peringkat', 'Unit Kerja', 'Total Tiket Masuk']
+            const rankTableData = rankingData.map((r, i) => [
+                i + 1,
+                r.name,
+                r.total
+            ]);
+
+            // Second table: details
+            const tableHeaders = ['No', 'ID Tiket', 'Tanggal', 'Pengirim', 'Kategori', 'Unit Kerja', 'Status']
+            const pdfTableData = filteredData.map((d, index) => [
+                index + 1,
+                d.id_tiket,
+                d.tanggal,
+                d.pengirim,
+                d.kategori,
+                d.unit,
+                d.status
+            ]);
+            let filterDesc = `Periode: ${dateRange.start ? `${dateRange.start} s/d ${dateRange.end || 'Sekarang'}` : 'Seluruh Riwayat'} | Unit: ${filterUnit === 'Semua' ? 'Keseluruhan' : units.find(u => u.id === filterUnit)?.nama || filterUnit} | Kategori: ${filterJenis}`
+
+            generateFormalPDF({
+                title: 'LAPORAN REKAPITULASI LAYANAN KOMPLAIN DAN SURVEI (KOMPREHENSIF)',
+                additionalInfo: [
+                    filterDesc,
+                    `Rangkuman KPI: Total ${totalCount} Data | Selesai ${selesaiCount} (${totalCount > 0 ? Math.round((selesaiCount / totalCount) * 100) : 0}%) | Survei ${surveiCount} | Pengaduan ${pengaduanCount}`,
+                    '',
+                    'A. Ranking Unit Kerja Berdasarkan Volume Aduan Masuk:'
+                ],
+                filename: `Laporan_PUAS_Komprehensif_${new Date().toISOString().slice(0, 10)}.pdf`,
+                appSettings,
+                printDate,
+                signerName,
+                signerRole,
+                tableHeaders: rankHeaders,
+                tableData: rankTableData,
+                additionalInfoBottom: [
+                    '',
+                    'B. Tabulasi Detail Tiket dan Rekapitulasi Laporan:'
+                ],
+                tableHeadersBottom: tableHeaders,
+                tableDataBottom: pdfTableData
+            });
+            setIsGenerating(false)
+        }, 500)
     }
 
     return (
@@ -238,11 +330,12 @@ export default function LaporanEksportPage() {
                             </button>
 
                             <button
-                                onClick={handlePrintPDF}
-                                className="px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-md shadow-slate-900/20"
+                                onClick={handleExportPDF}
+                                disabled={isGenerating}
+                                className="px-5 py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-md shadow-slate-900/20 disabled:opacity-50"
                             >
                                 <FileText className="w-5 h-5" />
-                                Unduh PDF
+                                {isGenerating ? 'Memproses...' : 'Unduh PDF'}
                             </button>
                         </div>
                     </div>
@@ -292,6 +385,47 @@ export default function LaporanEksportPage() {
                 </motion.div>
             </div>
 
+            {/* SEBARAN CHART & RANKING CHART */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 print:hidden">
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                    <h3 className="font-extrabold text-slate-800 text-lg mb-2">Sebaran Kategori Layanan</h3>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} height={40} angle={-15} textAnchor="end" />
+                                <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px' }} />
+                                <Bar dataKey="total" fill="#3b82f6" barSize={40} radius={[4, 4, 0, 0]}>
+                                    {chartData.map((_entry: any, index: number) => (
+                                        <Cell key={`cell-${index}`} fill={'#6366f1'} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                    <h3 className="font-extrabold text-slate-800 text-lg mb-2">Ranking Unit Kerja Terbanyak</h3>
+                    <div className="h-[250px] w-full">
+                        {rankingData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={rankingData.slice(0, 5)} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                                    <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 10, fontWeight: 600, fill: '#475569' }} axisLine={false} tickLine={false} />
+                                    <RechartsTooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px' }} />
+                                    <Bar dataKey="total" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-slate-400 text-sm">Belum ada data unit rujukan</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
             {/* TABULAR PREVIEW */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-8 print:hidden">
                 <div className="p-6 border-b border-slate-100">
@@ -335,117 +469,6 @@ export default function LaporanEksportPage() {
                 </div>
             </div>
 
-            {/* --- FORMAL PRINT TEMPLATE (VISIBLE ONLY ON PRINT/PREVIEW) --- */}
-            <div className="hidden print:block bg-white p-0 mx-auto max-w-[210mm] w-[100%] min-h-[297mm]">
-                {/* Kop Surat MENGGUNAKAN APP_SETTINGS */}
-                <div className="flex items-center justify-between border-b-[3px] border-black pb-4 mb-1 border-double">
-                    <div className="w-20 h-20 bg-slate-200 flex items-center justify-center font-bold text-slate-500 rounded-lg shrink-0 border border-slate-300">
-                        LOGO
-                    </div>
-                    <div className="text-center flex-1 px-4 text-black">
-                        <h1 className="text-xl font-bold uppercase tracking-wider">{appSettings.kop_nama}</h1>
-                        <h2 className="text-lg font-bold uppercase tracking-wider">{appSettings.kop_rs}</h2>
-                        <p className="text-xs mt-1">{appSettings.kop_alamat}</p>
-                        <p className="text-xs">{appSettings.kop_kontak}</p>
-                    </div>
-                    <div className="w-20 shrink-0" />
-                </div>
-                <div className="border-b-[1px] border-black mb-6 w-full" />
-
-                {/* Title */}
-                <div className="text-center mb-6 text-black">
-                    <h3 className="text-sm font-bold uppercase underline underline-offset-4">Rekapitulasi Layanan Komplain & Survei</h3>
-                    <p className="text-xs mt-1">
-                        Filter: Unit ({filterUnit === 'Semua' ? 'Keseluruhan' : units.find(u => u.id === filterUnit)?.nama || filterUnit}) | Kategori ({filterJenis === 'Semua' ? 'Keseluruhan' : filterJenis})
-                    </p>
-                    <p className="text-xs mt-1">Periode Data: {dateRange.start ? `${dateRange.start} s/d ${dateRange.end || 'Sekarang'}` : 'Seluruh Riwayat'}</p>
-                </div>
-
-                {/* KPI/Summary in Print */}
-                <div className="flex border border-black mb-6 text-black">
-                    <div className="flex-1 p-3 border-r border-black flex flex-col justify-center items-center">
-                        <p className="text-[10px] uppercase font-bold text-center mb-1">Total Data Filter</p>
-                        <h4 className="text-lg font-bold text-center">{totalCount}</h4>
-                    </div>
-                    <div className="flex-1 p-3 border-r border-black flex flex-col justify-center items-center">
-                        <p className="text-[10px] uppercase font-bold text-center mb-1">Tindakan Selesai</p>
-                        <h4 className="text-lg font-bold text-center">{selesaiCount}</h4>
-                    </div>
-                    <div className="flex-1 p-3 flex flex-col justify-center items-center">
-                        <p className="text-[10px] uppercase font-bold text-center mb-1">Rasio Selesai</p>
-                        <h4 className="text-lg font-bold text-center">
-                            {totalCount > 0 ? Math.round((selesaiCount / totalCount) * 100) : 0}%
-                        </h4>
-                    </div>
-                </div>
-
-                {/* Chart Image rendering inside print (Recharts is rendered dynamically in print) */}
-                <div className="mb-6 h-[200px] w-full text-black">
-                    <p className="text-xs font-bold uppercase mb-2">Sebaran Kategori Layanan:</p>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                            <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#000' }} interval={0} />
-                            <YAxis tick={{ fontSize: 10, fill: '#000' }} axisLine={false} tickLine={false} />
-                            <Bar dataKey="total" fill="#0f172a" barSize={40}>
-                                {chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={'#64748b'} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-
-                {/* Dynamic Data Table */}
-                <div className="font-sans text-black">
-                    <p className="text-xs font-bold uppercase mb-2">Daftar Rekapitulasi Baris:</p>
-                    <table className="w-full text-[10px] text-left border-collapse border border-black">
-                        <thead className="bg-slate-100 font-bold">
-                            <tr>
-                                <th className="border border-black p-1.5 text-center w-8">No</th>
-                                <th className="border border-black p-1.5 w-24">ID Tiket</th>
-                                <th className="border border-black p-1.5">Tanggal</th>
-                                <th className="border border-black p-1.5">Kategori</th>
-                                <th className="border border-black p-1.5">Unit Tujuan</th>
-                                <th className="border border-black p-1.5 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredData.length === 0 && (
-                                <tr><td colSpan={6} className="p-4 text-center italic">Memuat data atau data kosong...</td></tr>
-                            )}
-                            {filteredData.map((row, index) => (
-                                <tr key={row.no}>
-                                    <td className="border border-black p-1.5 text-center">{index + 1}</td>
-                                    <td className="border border-black p-1.5 text-center font-mono">{row.id_tiket}</td>
-                                    <td className="border border-black p-1.5">{row.tanggal}</td>
-                                    <td className="border border-black p-1.5 font-bold">{row.kategori}</td>
-                                    <td className="border border-black p-1.5">{row.unit}</td>
-                                    <td className="border border-black p-1.5 text-center">{row.status}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Footer Signatures */}
-                <div className="mt-12 flex justify-end text-black font-sans break-inside-avoid">
-                    <div className="text-center w-64">
-                        <p className="text-xs mb-16">{appSettings.kop_nama.replace('Pemerintah ', '').replace('Provinsi ', '').replace('Kabupaten ', '')}, {new Date(printDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                        <p className="text-xs font-bold underline underline-offset-2">{signerName}</p>
-                        <p className="text-[10px] mt-1">{signerRole}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Global Print CSS Override */}
-            <style dangerouslySetInnerHTML={{
-                __html: `
-        @media print {
-          body { background: white !important; font-family: 'Times New Roman', Times, serif; }
-          main, aside, nav, header { display: none !important; }
-        }
-      `}} />
         </div>
     )
 }

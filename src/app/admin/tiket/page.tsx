@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { Inbox, Filter, Download, ArrowRight, MessageSquare, Clock, X, CheckCircle, ShieldCheck, Mail, Edit, FileText } from 'lucide-react'
+import { Inbox, Filter, Download, ArrowRight, MessageSquare, Clock, X, CheckCircle, ShieldCheck, Mail, Edit, FileText, AlertTriangle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/utils/cn'
 import * as xlsx from 'xlsx'
+import { generateFormalPDF } from '@/utils/pdfExport'
 
 export default function AdminTiketPage() {
     const [tickets, setTickets] = useState<any[]>([])
@@ -15,13 +16,29 @@ export default function AdminTiketPage() {
     const [isUpdating, setIsUpdating] = useState(false)
     const supabase = createClient()
     const [isGenerating, setIsGenerating] = useState(false)
+    const [units, setUnits] = useState<any[]>([])
+    const [profiles, setProfiles] = useState<any[]>([])
+    const [actionForm, setActionForm] = useState({
+        actionType: 'respon',
+        lapor_ke_role: '',
+        lapor_unit_id: '',
+        eskalasi_ke_role: '',
+        eskalasi_ke_user: '',
+        tembusan_unit_id: '',
+        catatan: '',
+        statusUpdate: '' // auto status: 'eskalasi' or 'selesai'
+    })
 
     // Setup for formal print report matching app_settings
     const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10))
     const [signerName, setSignerName] = useState('')
     const [signerRole, setSignerRole] = useState('')
     const [appSettings, setAppSettings] = useState({ kop_nama: 'Pemerintah Kota Sejahtera', kop_rs: 'Rumah Sakit Umum Daerah', kop_alamat: 'Jl. Jend. Sudirman No. 123, Telepon: (021) 555-0192', kop_kontak: 'Email: rsud@sejahtera.go.id | Website: rsud.sejahtera.go.id' })
+    const [whatsappKontak, setWhatsappKontak] = useState('')
 
+    // Hidden keys to exclude from data display
+    // Hidden keys to exclude from data display
+    const HIDDEN_KEYS = ['unit_id', 'id', 'submitter_id', 'original_unit_id', 'tindakan_terakhir', 'unitId', 'unit Id', 'rating', 'ratings']
 
     const fetchData = async () => {
         setIsLoading(true)
@@ -39,6 +56,7 @@ export default function AdminTiketPage() {
             })
             setSignerName(settingsMap['nama_penandatangan'] || 'Dr. Mulyadi Saputra, MARS')
             setSignerRole(settingsMap['jabatan_penandatangan'] || 'Direktur Utama RSUD Kota Sejahtera')
+            setWhatsappKontak(settingsMap['whatsapp_kontak'] || '')
         } else {
             setSignerName('Dr. Mulyadi Saputra, MARS')
             setSignerRole('Direktur Utama RSUD Kota Sejahtera')
@@ -51,6 +69,13 @@ export default function AdminTiketPage() {
             .order('created_at', { ascending: false })
         if (error) console.error('Error fetching tickets:', error)
         setTickets(data || [])
+
+        // Units & Profiles for Escalation
+        const { data: unitsData } = await supabase.from('units').select('id, nama').order('nama')
+        setUnits(unitsData || [])
+        const { data: profilesData } = await supabase.from('profiles').select('id, nama_lengkap, role').order('nama_lengkap')
+        setProfiles(profilesData || [])
+
         setIsLoading(false)
     }
 
@@ -61,51 +86,166 @@ export default function AdminTiketPage() {
     const handleOpenDetail = (ticket: any) => {
         setSelectedTicket(ticket)
         setIsDetailOpen(true)
+        // Reset action form
+        setActionForm({
+            actionType: 'respon',
+            lapor_ke_role: '',
+            lapor_unit_id: '',
+            eskalasi_ke_role: '',
+            eskalasi_ke_user: '',
+            tembusan_unit_id: '',
+            catatan: '',
+            statusUpdate: ''
+        })
     }
 
-    const handleUpdateStatus = async (newStatus: string) => {
-        if (!selectedTicket) return
-        setIsUpdating(true)
-        await supabase.from('tickets').update({ status: newStatus }).eq('id', selectedTicket.id)
+    const handleExecuteAction = async () => {
+        if (!selectedTicket) return;
+        setIsUpdating(true);
 
-        // Optimistic update
-        setSelectedTicket({ ...selectedTicket, status: newStatus })
-        setTickets(tickets.map(t => t.id === selectedTicket.id ? { ...t, status: newStatus } : t))
-        setIsUpdating(false)
+        const payload = {
+            action: actionForm.actionType,
+            ...actionForm,
+            timestamp: new Date().toISOString()
+        };
+
+        const newPayload = {
+            ...(selectedTicket.data_payload || {}),
+            tindakan_terakhir: payload
+        }
+
+        // Determine new status based on checklist
+        let newStatus = selectedTicket.status
+        if (actionForm.statusUpdate === 'eskalasi') {
+            newStatus = 'Diproses'
+        } else if (actionForm.statusUpdate === 'selesai') {
+            newStatus = 'Selesai'
+        }
+
+        const { error } = await supabase.from('tickets').update({
+            data_payload: newPayload,
+            status: newStatus
+        }).eq('id', selectedTicket.id);
+
+        if (!error) {
+            setActionForm({ actionType: 'respon', catatan: '', lapor_ke_role: '', lapor_unit_id: '', eskalasi_ke_role: '', eskalasi_ke_user: '', tembusan_unit_id: '', statusUpdate: '' });
+            fetchData();
+            setIsDetailOpen(false);
+            alert('Tindakan berhasil dikirim!');
+        } else {
+            alert('Gagal mengirim tindakan: ' + error.message);
+        }
+        setIsUpdating(false);
     }
 
     const handleExportExcel = () => {
         setIsGenerating(true)
         setTimeout(() => {
-            const worksheetData = tickets.map((t, index) => ({
-                No: index + 1,
-                'ID Tiket': t.tracking_number,
-                Tanggal: new Date(t.created_at).toLocaleString('id-ID'),
-                Kategori: t.jenis.replace('_', ' ').toUpperCase(),
-                Unit: t.units?.nama || 'Global',
-                Status: t.status,
-                'Nama Pemohon': t.data_pelapor?.nama || t.data_payload?.nama || '-',
-                'Nomor HP': t.data_pelapor?.hp || t.data_payload?.hp || '-'
-            }))
+            const worksheetData = tickets.map((t, index) => {
+                const reporter = t.data_pelapor?.nama || t.data_payload?.nama || '-'
+                const phone = t.data_pelapor?.hp || t.data_payload?.hp || '-'
+                const detail = t.data_payload?.uraian || t.data_payload?.feedback || t.data_payload?.informasi_diminta || '-'
 
-            const worksheet = xlsx.utils.json_to_sheet(worksheetData)
+                return {
+                    No: index + 1,
+                    'ID Tiket': t.tracking_number,
+                    Tanggal: new Date(t.created_at).toLocaleString('id-ID'),
+                    Kategori: t.jenis.replace('_', ' ').toUpperCase(),
+                    Unit: t.units?.nama || 'Global',
+                    Status: t.status,
+                    'Nama Pemohon / Pelapor': reporter,
+                    'Nomor HP Pemohon': phone,
+                    'Keperluan / Uraian Detail': detail,
+                    'Tindakan Terakhir': t.data_payload?.tindakan_terakhir?.action || '-'
+                }
+            })
+
+            // Create worksheet
+            const worksheet = xlsx.utils.json_to_sheet([])
+
+            // Add Header Rows
+            xlsx.utils.sheet_add_aoa(worksheet, [
+                [appSettings.kop_nama.toUpperCase()],
+                [appSettings.kop_rs.toUpperCase()],
+                [`${appSettings.kop_alamat} | ${appSettings.kop_kontak}`],
+                [],
+                ['LAPORAN MANAJEMEN TIKET KOMPREHENSIF'],
+                [`Tanggal Cetak: ${new Date(printDate).toLocaleDateString('id-ID')}`],
+                [`Penanggung Jawab Laporan: ${signerName} (${signerRole})`],
+                [],
+                ['1. Tabulasi Data Tiket Masuk']
+            ], { origin: 'A1' })
+
+            // Add actual data starting from A10
+            xlsx.utils.sheet_add_json(worksheet, worksheetData, { origin: 'A10' })
+
             const workbook = xlsx.utils.book_new()
             xlsx.utils.book_append_sheet(workbook, worksheet, "Raw_Tiket")
-            xlsx.writeFile(workbook, `Data_Mentah_Tiket_${new Date().toISOString().slice(0, 10)}.xlsx`)
+            xlsx.writeFile(workbook, `Data_Tiket_${new Date().toISOString().slice(0, 10)}.xlsx`)
             setIsGenerating(false)
         }, 1000)
     }
 
+    const handleExportPDF = () => {
+        setIsGenerating(true)
+        setTimeout(() => {
+            const tableHeaders = ['No', 'ID Tiket', 'Tanggal', 'Kategori', 'Unit', 'Status', 'Saran/Uraian'];
+            const tableData = tickets.map((t, index) => {
+                const detail = t.data_payload?.uraian || t.data_payload?.feedback || t.data_payload?.informasi_diminta || '-'
+                return [
+                    index + 1,
+                    t.tracking_number,
+                    new Date(t.created_at).toLocaleString('id-ID'),
+                    t.jenis.replace('_', ' ').toUpperCase(),
+                    t.units?.nama || 'Global',
+                    t.status,
+                    detail
+                ]
+            });
+
+            generateFormalPDF({
+                title: 'LAPORAN MANAJEMEN TIKET (KOMPREHENSIF)',
+                additionalInfo: [
+                    'Laporan ini berisikan rincian seluruh tiket aduan, layanan, dan komplain yang terdaftar dalam sistem.',
+                    `Total Laporan: ${tickets.length} Tiket | Tiket Selesai: ${tickets.filter(x => x.status === 'Selesai').length}`,
+                    '',
+                    '1. Rincian Tiket dan Uraian Laporan:'
+                ],
+                filename: `Laporan_Tiket_Komprehensif_${new Date().toISOString().slice(0, 10)}.pdf`,
+                appSettings,
+                printDate,
+                signerName,
+                signerRole,
+                tableHeaders,
+                tableData
+            });
+            setIsGenerating(false)
+        }, 500)
+    }
+
     const renderDataSection = (title: string, dataObj: any) => {
         if (!dataObj) return null
+        // Filter out hidden keys like unit_id - case insensitive, and also UUID-looking values
+        const isUUID = (val: any) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val)
+        const filteredEntries = Object.entries(dataObj).filter(([key, value]) => {
+            const keyLower = key.toLowerCase().replace(/[\s_-]/g, '')
+            // Hide technical keys
+            if (HIDDEN_KEYS.some(hk => keyLower === hk.toLowerCase().replace(/[\s_-]/g, ''))) return false
+            // Hide any key ending with 'id' that has a UUID value
+            if (keyLower.endsWith('id') && isUUID(value)) return false
+            // Hide internal objects like tindakan_terakhir
+            if (key === 'tindakan_terakhir') return false
+            return true
+        })
+        if (filteredEntries.length === 0) return null
         return (
             <div className="mb-6">
                 <h4 className="font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2">{title}</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {Object.entries(dataObj).map(([key, value]: any) => (
+                    {filteredEntries.map(([key, value]: any) => (
                         <div key={key} className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                            <p className="text-sm font-semibold text-slate-800">{value?.toString() || '-'}</p>
+                            <p className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim()}</p>
+                            <p className="text-sm font-semibold text-slate-900">{typeof value === 'object' ? JSON.stringify(value) : (value?.toString() || '-')}</p>
                         </div>
                     ))}
                 </div>
@@ -131,10 +271,11 @@ export default function AdminTiketPage() {
                             <Download className="w-4 h-4" /> {isGenerating ? 'Memroses...' : 'Ekspor Excel'}
                         </button>
                         <button
-                            onClick={() => window.print()}
-                            className="flex items-center gap-2 bg-slate-900 border border-slate-800 text-white hover:bg-slate-800 px-4 py-2 text-sm rounded-xl font-bold transition-all shadow-sm"
+                            onClick={handleExportPDF}
+                            disabled={isGenerating}
+                            className="flex items-center gap-2 bg-slate-900 border border-slate-800 text-white hover:bg-slate-800 px-4 py-2 text-sm rounded-xl font-bold transition-all shadow-sm disabled:opacity-50"
                         >
-                            <FileText className="w-4 h-4" /> Unduh PDF
+                            <FileText className="w-4 h-4" /> {isGenerating ? 'Memroses...' : 'Unduh PDF'}
                         </button>
                     </div>
                 </div>
@@ -349,40 +490,8 @@ export default function AdminTiketPage() {
                             {/* Slide-over Body */}
                             <div className="flex-1 overflow-y-auto p-6">
 
-                                {/* Ticket Progress Logic */}
-                                <div className="mb-8">
-                                    <h4 className="font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2">
-                                        <Edit className="w-4 h-4 text-primary" /> Status Terkini
-                                    </h4>
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        {['Terkirim', 'Diverifikasi', 'Diproses', 'Selesai'].map((statusOption) => {
-                                            const isActive = selectedTicket.status === statusOption
-                                            return (
-                                                <button
-                                                    key={statusOption}
-                                                    disabled={isUpdating || isActive}
-                                                    onClick={() => handleUpdateStatus(statusOption)}
-                                                    className={cn(
-                                                        "px-4 py-2 text-xs font-bold rounded-xl border transition-all flex items-center gap-2",
-                                                        isActive
-                                                            ? "bg-slate-900 text-white border-slate-900 shadow-md transform scale-105"
-                                                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300 opacity-60 hover:opacity-100"
-                                                    )}
-                                                >
-                                                    {statusOption === 'Terkirim' && <Mail className="w-3.5 h-3.5" />}
-                                                    {statusOption === 'Diverifikasi' && <ShieldCheck className="w-3.5 h-3.5" />}
-                                                    {statusOption === 'Diproses' && <Clock className="w-3.5 h-3.5" />}
-                                                    {statusOption === 'Selesai' && <CheckCircle className="w-3.5 h-3.5" />}
-                                                    {statusOption}
-                                                </button>
-                                            )
-                                        })}
-                                    </div>
-                                    <p className="text-xs text-slate-400 mt-3 font-medium">Klik status lain untuk meng-update tiket ini secara langsung.</p>
-                                </div>
-
-                                {/* Form Data rendering */}
-                                <div className="space-y-2">
+                                {/* Form Data rendering - NO unit_id shown */}
+                                <div className="space-y-4">
                                     {renderDataSection('Data Pemohon / Pelapor', selectedTicket.data_pelapor)}
                                     {renderDataSection('Data Kejadian', selectedTicket.data_kejadian)}
                                     {renderDataSection('Aduan & Detail', selectedTicket.data_aduan)}
@@ -393,17 +502,146 @@ export default function AdminTiketPage() {
                                 </div>
                             </div>
 
-                            {/* Slide-over Footer */}
-                            <div className="p-6 border-t border-slate-100 bg-white shrink-0 space-y-3">
-                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Catatan Respon Publik (Opsional)</label>
-                                <textarea
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none"
-                                    placeholder="Tuliskan respon atau balasan yang dapat dilacak via No. Tiket..."
-                                    rows={3}
-                                />
-                                <button className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-md hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2">
-                                    <MessageSquare className="w-4 h-4" /> Simpan & Kirim Respon
-                                </button>
+                            {/* Form Tindakan: Respon / Eskalasi / Lapor */}
+                            <div className="p-6 border-t border-slate-100 bg-slate-50 shrink-0 space-y-4">
+                                <div className="flex gap-2 p-1 bg-slate-200/50 rounded-xl">
+                                    <button onClick={() => setActionForm({ ...actionForm, actionType: 'respon' })} className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", actionForm.actionType === 'respon' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-slate-700')}>Respon Biasa</button>
+                                    <button onClick={() => setActionForm({ ...actionForm, actionType: 'eskalasi' })} className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", actionForm.actionType === 'eskalasi' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-slate-700')}>Eskalasi</button>
+                                    <button onClick={() => setActionForm({ ...actionForm, actionType: 'lapor' })} className={cn("flex-1 py-2 text-xs font-bold rounded-lg transition-all", actionForm.actionType === 'lapor' ? 'bg-white text-black shadow-sm' : 'text-slate-500 hover:text-slate-700')}>Lapor Atasan</button>
+                                </div>
+
+                                <AnimatePresence mode="wait">
+                                    <motion.div key={actionForm.actionType} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="space-y-4">
+
+                                        {actionForm.actionType === 'eskalasi' && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Tujuan Role Eskalasi</label>
+                                                    <select value={actionForm.eskalasi_ke_role} onChange={e => setActionForm({ ...actionForm, eskalasi_ke_role: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
+                                                        <option value="" className="text-black">- Pilih Role -</option>
+                                                        <option value="user_lain" className="text-black">User Lain</option>
+                                                        <option value="supervisor" className="text-black">Supervisor</option>
+                                                        <option value="manajer" className="text-black">Manajer</option>
+                                                        <option value="direktur" className="text-black">Direktur</option>
+                                                    </select>
+                                                </div>
+                                                {actionForm.eskalasi_ke_role === 'user_lain' ? (
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Pilih Pengguna</label>
+                                                        <select value={actionForm.eskalasi_ke_user} onChange={e => setActionForm({ ...actionForm, eskalasi_ke_user: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
+                                                            <option value="" className="text-black">- Pilih Pengguna -</option>
+                                                            {profiles.map(p => <option key={p.id} value={p.id} className="text-black">{p.nama_lengkap} ({p.role})</option>)}
+                                                        </select>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Tembusan (Unit Terkait)</label>
+                                                        <select value={actionForm.tembusan_unit_id} onChange={e => setActionForm({ ...actionForm, tembusan_unit_id: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
+                                                            <option value="" className="text-black">- Tanpa Tembusan -</option>
+                                                            {units.map(u => <option key={u.id} value={u.id} className="text-black">{u.nama}</option>)}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                                {actionForm.eskalasi_ke_role === 'user_lain' && (
+                                                    <div className="col-span-2">
+                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Tembusan (Unit Terkait)</label>
+                                                        <select value={actionForm.tembusan_unit_id} onChange={e => setActionForm({ ...actionForm, tembusan_unit_id: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
+                                                            <option value="" className="text-black">- Tanpa Tembusan -</option>
+                                                            {units.map(u => <option key={u.id} value={u.id} className="text-black">{u.nama}</option>)}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {actionForm.actionType === 'lapor' && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Lapor Kepada</label>
+                                                    <select value={actionForm.lapor_ke_role} onChange={e => setActionForm({ ...actionForm, lapor_ke_role: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
+                                                        <option value="" className="text-black">- Pilih Atasan -</option>
+                                                        <option value="supervisor" className="text-black">Supervisor</option>
+                                                        <option value="manajer" className="text-black">Manajer</option>
+                                                        <option value="direktur" className="text-black">Direktur</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Unit Kerja Tujuan</label>
+                                                    <select value={actionForm.lapor_unit_id} onChange={e => setActionForm({ ...actionForm, lapor_unit_id: e.target.value })} className="w-full text-xs font-semibold p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-primary/20 bg-white text-black">
+                                                        <option value="" className="text-black">- Pilih Unit Kerja -</option>
+                                                        {units.map(u => <option key={u.id} value={u.id} className="text-black">{u.nama}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Catatan Tindakan</label>
+                                            <textarea
+                                                value={actionForm.catatan}
+                                                onChange={e => setActionForm({ ...actionForm, catatan: e.target.value })}
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-black outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none shadow-sm"
+                                                placeholder="Tuliskan respon, alasan eskalasi, atau hal penting dari laporan..."
+                                                rows={3}
+                                            />
+                                        </div>
+
+                                        {/* STATUS UPDATE CHECKLIST - before submit button */}
+                                        <div className="bg-gradient-to-r from-slate-50 to-slate-100/50 border border-slate-200 rounded-xl p-4">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                                <ShieldCheck className="w-3.5 h-3.5" /> Update Status Otomatis
+                                            </p>
+                                            <div className="flex flex-wrap gap-3">
+                                                <label className={cn(
+                                                    "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm font-bold",
+                                                    actionForm.statusUpdate === 'eskalasi'
+                                                        ? "border-amber-400 bg-amber-50 text-amber-800 shadow-sm shadow-amber-200/50"
+                                                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                                                )}>
+                                                    <input
+                                                        type="radio"
+                                                        name="statusUpdate"
+                                                        value="eskalasi"
+                                                        checked={actionForm.statusUpdate === 'eskalasi'}
+                                                        onChange={() => setActionForm({ ...actionForm, statusUpdate: 'eskalasi' })}
+                                                        className="w-4 h-4 accent-amber-500"
+                                                    />
+                                                    <AlertTriangle className="w-4 h-4" />
+                                                    Eskalasi (Diproses)
+                                                </label>
+                                                <label className={cn(
+                                                    "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all text-sm font-bold",
+                                                    actionForm.statusUpdate === 'selesai'
+                                                        ? "border-emerald-400 bg-emerald-50 text-emerald-800 shadow-sm shadow-emerald-200/50"
+                                                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                                                )}>
+                                                    <input
+                                                        type="radio"
+                                                        name="statusUpdate"
+                                                        value="selesai"
+                                                        checked={actionForm.statusUpdate === 'selesai'}
+                                                        onChange={() => setActionForm({ ...actionForm, statusUpdate: 'selesai' })}
+                                                        className="w-4 h-4 accent-emerald-500"
+                                                    />
+                                                    <CheckCircle className="w-4 h-4" />
+                                                    Selesai
+                                                </label>
+                                                {actionForm.statusUpdate && (
+                                                    <button
+                                                        onClick={() => setActionForm({ ...actionForm, statusUpdate: '' })}
+                                                        className="text-[10px] text-slate-400 hover:text-red-500 font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
+                                                    >
+                                                        <X className="w-3 h-3" /> Reset
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <button disabled={isUpdating} onClick={handleExecuteAction} className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
+                                            {isUpdating ? <span className="animate-pulse">Menyimpan...</span> : <><MessageSquare className="w-4 h-4" /> Simpan & Kirim Tindakan</>}
+                                        </button>
+                                    </motion.div>
+                                </AnimatePresence>
                             </div>
                         </motion.div>
                     </>

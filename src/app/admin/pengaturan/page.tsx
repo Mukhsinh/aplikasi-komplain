@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Save, Bell, Clock, Building, ShieldCheck, Mail, Sliders, CheckCircle2, AlertCircle, FileText, User, Phone, MapPin, Globe } from 'lucide-react'
+import { Save, Bell, Clock, Building, ShieldCheck, Mail, Sliders, CheckCircle2, AlertCircle, FileText, User, Phone, MapPin, Globe, MessageCircle } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import { createClient } from '@/utils/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
     alamat_instansi: 'Jl. Jend. Sudirman No. 123',
     kontak_instansi: 'Telp: (021) 555-0192 | Email: rsud@sejahtera.go.id',
     website_instansi: 'rsud.sejahtera.go.id',
+    whatsapp_kontak: '',
     nama_penandatangan: 'Dr. Mulyadi Saputra, MARS',
     jabatan_penandatangan: 'Direktur Utama RSUD Kota Sejahtera',
     nip_penandatangan: '',
@@ -273,6 +274,42 @@ export default function AdminSettingsPage() {
                                         </div>
                                         <InputField value={settings.kontak_instansi || ''} onChange={(val) => handleChange('kontak_instansi', val)} label="Kontak (Telp/Email)" icon={Phone} placeholder="Telp: (021) 555-0192" />
                                         <InputField value={settings.website_instansi || ''} onChange={(val) => handleChange('website_instansi', val)} label="Website" icon={Globe} placeholder="rsud.sejahtera.go.id" />
+                                    </div>
+                                </div>
+
+                                {/* WhatsApp Contact */}
+                                <div className="pt-6 border-t border-slate-100 space-y-6">
+                                    <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                        <MessageCircle className="w-4 h-4 text-emerald-500" /> Kontak WhatsApp
+                                    </h3>
+                                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100/60 p-5 rounded-2xl flex gap-4 text-emerald-900 text-sm items-start shadow-sm">
+                                        <div className="bg-emerald-100 p-2 rounded-xl text-emerald-600 shrink-0">
+                                            <MessageCircle className="w-5 h-5" />
+                                        </div>
+                                        <p className="font-medium leading-relaxed">Nomor WhatsApp ini akan digunakan untuk fitur <strong>&quot;Hubungi WA&quot;</strong> pada halaman pelacakan tiket dan halaman publik lainnya. Pastikan menggunakan format internasional (misal: <strong>6281234567890</strong>).</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                        <InputField
+                                            value={settings.whatsapp_kontak || ''}
+                                            onChange={(val) => handleChange('whatsapp_kontak', val)}
+                                            label="Nomor WhatsApp"
+                                            icon={MessageCircle}
+                                            placeholder="6281234567890"
+                                            hint="Format internasional tanpa tanda + (contoh: 6281234567890)"
+                                        />
+                                        <div className="flex items-end">
+                                            {settings.whatsapp_kontak && (
+                                                <a
+                                                    href={`https://wa.me/${settings.whatsapp_kontak.replace(/\D/g, '')}?text=${encodeURIComponent('Test koneksi WhatsApp dari sistem PUAS')}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="px-5 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white font-bold rounded-xl text-sm shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 flex items-center gap-2"
+                                                >
+                                                    <MessageCircle className="w-4 h-4" />
+                                                    Test WhatsApp
+                                                </a>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 

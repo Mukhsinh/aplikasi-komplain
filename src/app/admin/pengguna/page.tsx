@@ -21,8 +21,9 @@ export default function AdminPenggunaPage() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
 
-    const [formData, setFormData] = useState({ id: '', nama_lengkap: '', role: 'user', unit_id: '' })
-    const [addFormData, setAddFormData] = useState({ nama_lengkap: '', email: '', password: '', role: 'staf', unit_id: '' })
+    const [formData, setFormData] = useState({ id: '', nama_lengkap: '', role: 'user', unit_id: '', whatsapp: '' })
+    const [addFormData, setAddFormData] = useState({ nama_lengkap: '', email: '', password: '', role: 'user', unit_id: '', whatsapp: '' })
+
     const [isSaving, setIsSaving] = useState(false)
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
@@ -79,7 +80,7 @@ export default function AdminPenggunaPage() {
     // ======== HANDLERS ========
 
     const handleOpenEdit = (user: any) => {
-        setFormData({ id: user.id, nama_lengkap: user.nama_lengkap || '', role: user.role || 'user', unit_id: user.unit_id || '' })
+        setFormData({ id: user.id, nama_lengkap: user.nama_lengkap || '', role: user.role || 'user', unit_id: user.unit_id || '', whatsapp: user.whatsapp || '' })
         setIsEditModalOpen(true)
     }
 
@@ -89,11 +90,15 @@ export default function AdminPenggunaPage() {
         const { error } = await supabase.from('profiles').update({
             nama_lengkap: formData.nama_lengkap,
             role: formData.role,
+            whatsapp: formData.whatsapp,
             unit_id: formData.unit_id || null
         }).eq('id', formData.id)
 
         if (error) { showToast('error', 'Gagal menyimpan: ' + error.message) }
-        else { showToast('success', 'Profil berhasil diperbarui'); fetchProfiles() }
+        else {
+            showToast('success', 'Profil berhasil diperbarui');
+            fetchProfiles()
+        }
         setIsSaving(false)
         setIsEditModalOpen(false)
     }
@@ -134,6 +139,7 @@ export default function AdminPenggunaPage() {
                         password: addFormData.password,
                         nama_lengkap: addFormData.nama_lengkap,
                         role: addFormData.role,
+                        whatsapp: addFormData.whatsapp,
                         unit_id: addFormData.unit_id || null
                     })
                 }
@@ -145,7 +151,7 @@ export default function AdminPenggunaPage() {
                 showToast('error', result.error || 'Gagal membuat pengguna')
             } else {
                 showToast('success', `Pengguna "${addFormData.nama_lengkap}" berhasil dibuat!`)
-                setAddFormData({ nama_lengkap: '', email: '', password: '', role: 'staf', unit_id: '' })
+                setAddFormData({ nama_lengkap: '', email: '', password: '', role: 'user', unit_id: '', whatsapp: '' })
                 setIsAddModalOpen(false)
                 fetchProfiles()
             }
@@ -176,7 +182,9 @@ export default function AdminPenggunaPage() {
         const map: Record<string, string> = {
             superadmin: 'bg-gradient-to-r from-purple-100 to-violet-100 text-purple-700 border-purple-200',
             admin: 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 border-emerald-200',
-            staf: 'bg-slate-100 text-slate-600 border-slate-200',
+            direktur: 'bg-rose-50 text-rose-600 border-rose-200',
+            manajer: 'bg-amber-50 text-amber-600 border-amber-200',
+            supervisor: 'bg-indigo-50 text-indigo-600 border-indigo-200',
             user: 'bg-blue-50 text-blue-600 border-blue-200'
         }
         return map[role] || map.user
@@ -224,7 +232,7 @@ export default function AdminPenggunaPage() {
                     <p className="text-sm text-slate-500 font-medium">Kelola akun, hak akses, dan penempatan unit kerja pengguna sistem.</p>
                 </div>
                 <button
-                    onClick={() => { setAddFormData({ nama_lengkap: '', email: '', password: '', role: 'staf', unit_id: '' }); setShowPassword(false); setIsAddModalOpen(true) }}
+                    onClick={() => { setAddFormData({ nama_lengkap: '', email: '', password: '', role: 'user', unit_id: '', whatsapp: '' }); setShowPassword(false); setIsAddModalOpen(true) }}
                     className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 hover:-translate-y-0.5"
                 >
                     <UserPlus className="w-5 h-5" /> Tambah Pengguna Baru
@@ -293,10 +301,12 @@ export default function AdminPenggunaPage() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
-                                                {user.units?.nama ? (
+                                                {user.role === 'superadmin' || user.role === 'admin' ? (
+                                                    <span className="text-slate-400 italic text-xs">Global</span>
+                                                ) : user.units?.nama ? (
                                                     <span className="font-semibold text-slate-700 text-xs bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">{user.units.nama}</span>
                                                 ) : (
-                                                    <span className="text-slate-400 italic text-xs">Global</span>
+                                                    <span className="text-slate-400 italic text-xs">-</span>
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 text-center">
@@ -356,18 +366,29 @@ export default function AdminPenggunaPage() {
                                             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
                                     </div>
                                 </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">WhatsApp</label>
+                                    <div className="relative">
+                                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm border-r border-slate-200 pr-2">+62</div>
+                                        <input type="text" value={formData.whatsapp} onChange={e => {
+                                            const val = e.target.value.replace(/\D/g, '')
+                                            setFormData({ ...formData, whatsapp: val })
+                                        }}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-16 pr-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+                                    </div>
+                                </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Hak Akses</label>
-                                        <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}
+                                        <select value={formData.role} onChange={e => { setFormData({ ...formData, role: e.target.value }); }}
                                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 transition-all">
-                                            <option value="staf">Staf</option><option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Superadmin</option>
+                                            <option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Superadmin</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Unit Kerja</label>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Building2 className="w-3 h-3" /> Unit Kerja Utama</label>
                                         <select value={formData.unit_id} onChange={e => setFormData({ ...formData, unit_id: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+                                            className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-primary/20 transition-all">
                                             <option value="">— Global —</option>
                                             {units.map(u => <option key={u.id} value={u.id}>{u.nama}</option>)}
                                         </select>
@@ -458,20 +479,37 @@ export default function AdminPenggunaPage() {
                                     <p className="text-[10px] text-slate-400 mt-1.5 font-medium">Password harus minimal 6 karakter.</p>
                                 </div>
 
+                                {/* WhatsApp */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                        Nomor WhatsApp
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm border-r border-slate-200 pr-2">+62</div>
+                                        <input type="text" value={addFormData.whatsapp} onChange={e => {
+                                            const val = e.target.value.replace(/\D/g, '')
+                                            setAddFormData({ ...addFormData, whatsapp: val })
+                                        }}
+                                            className="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-16 pr-4 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all placeholder:text-slate-300"
+                                            placeholder="81234567890" />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-1.5 font-medium">Contoh: 81223334444 (tanpa angka 0 di depan)</p>
+                                </div>
+
                                 {/* Role & Unit */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
                                             <ShieldCheck className="w-3 h-3" /> Hak Akses
                                         </label>
-                                        <select value={addFormData.role} onChange={e => setAddFormData({ ...addFormData, role: e.target.value })}
+                                        <select value={addFormData.role} onChange={e => { setAddFormData({ ...addFormData, role: e.target.value }); }}
                                             className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all">
-                                            <option value="staf">Staf</option><option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Superadmin</option>
+                                            <option value="user">User</option><option value="admin">Admin</option><option value="superadmin">Superadmin</option>
                                         </select>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                            <Building2 className="w-3 h-3" /> Unit Kerja
+                                            <Building2 className="w-3 h-3" /> Unit Kerja Utama
                                         </label>
                                         <select value={addFormData.unit_id} onChange={e => setAddFormData({ ...addFormData, unit_id: e.target.value })}
                                             className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all">
@@ -480,6 +518,7 @@ export default function AdminPenggunaPage() {
                                         </select>
                                     </div>
                                 </div>
+
 
                                 {/* Actions */}
                                 <div className="pt-5 flex justify-end gap-3 border-t border-slate-100">

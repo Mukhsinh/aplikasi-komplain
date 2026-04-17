@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { FileText, Download, TrendingUp, Users, Star, Award, Heart, MessageSquare, Briefcase } from 'lucide-react'
+import { FileText, Download, TrendingUp, Users, Star, Award, Heart, MessageSquare, Briefcase, Filter } from 'lucide-react'
 import * as xlsx from 'xlsx'
 import { createClient } from '@/utils/supabase/client'
+import { generateFormalPDF } from '@/utils/pdfExport'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend
@@ -28,6 +29,7 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6'
 
 export default function AnalisisKepuasanPage() {
     const [isGenerating, setIsGenerating] = useState(false)
+    const [rankingFilter, setRankingFilter] = useState<'all' | 'top10' | 'bottom10'>('all')
     const [rawSurveys, setRawSurveys] = useState<any[]>([])
     const [printDate, setPrintDate] = useState(new Date().toISOString().slice(0, 10))
     const [signerName, setSignerName] = useState('Dr. Mulyadi Saputra, MARS')
@@ -68,7 +70,6 @@ export default function AnalisisKepuasanPage() {
         }
         fetchInitialData()
     }, [])
-
     // Analytics derived from rawSurveys
     const totalRespondents = rawSurveys.length
 
@@ -78,6 +79,7 @@ export default function AnalisisKepuasanPage() {
     const questionScores = SURVEY_QUESTIONS.map(q => ({ name: q.title, total: 0, count: 0 }))
 
     const pekerjaanCount: Record<string, number> = {}
+    const unitScores: Record<string, { total: number, count: number }> = {}
 
     const tableData = rawSurveys.map((s, index) => {
         const payload = s.data_payload || {}
@@ -104,6 +106,15 @@ export default function AnalisisKepuasanPage() {
         const job = payload.pekerjaan || 'Lainnya'
         pekerjaanCount[job] = (pekerjaanCount[job] || 0) + 1
 
+        const unitName = s.units?.nama || 'Global'
+
+        // Aggregate unit scores (only consider > 0 to avoid blank surveys bringing it down)
+        if (avgRating > 0) {
+            if (!unitScores[unitName]) unitScores[unitName] = { total: 0, count: 0 }
+            unitScores[unitName].total += avgRating
+            unitScores[unitName].count += 1
+        }
+
         return {
             no: index + 1,
             id: s.tracking_number,
@@ -111,7 +122,7 @@ export default function AnalisisKepuasanPage() {
             nama: payload.nama || 'Anonim',
             umur: payload.umur || '-',
             pekerjaan: job,
-            unit: s.units?.nama || 'Global',
+            unit: unitName,
             skor: avgRating.toFixed(2),
             feedback: payload.feedback || '-'
         }
@@ -128,10 +139,23 @@ export default function AnalisisKepuasanPage() {
         value: pekerjaanCount[key]
     }))
 
+    // Generate Unit Ranking Data
+    let unitRankingData = Object.keys(unitScores).map(name => ({
+        name,
+        count: unitScores[name].count,
+        skor: unitScores[name].count > 0 ? Number((unitScores[name].total / unitScores[name].count).toFixed(2)) : 0
+    })).sort((a, b) => b.skor - a.skor) // Sort desc natively
+
+    if (rankingFilter === 'top10') {
+        unitRankingData = unitRankingData.slice(0, 10)
+    } else if (rankingFilter === 'bottom10') {
+        unitRankingData = unitRankingData.slice(-10).reverse() // Show worst at the top of the group
+    }
+
     const handleExportExcel = () => {
         setIsGenerating(true)
         setTimeout(() => {
-            const worksheet = xlsx.utils.json_to_sheet(tableData.map(t => ({
+            const worksheetData = tableData.map(t => ({
                 No: t.no,
                 'ID Survei': t.id,
                 Tanggal: t.tanggal,
@@ -141,12 +165,96 @@ export default function AnalisisKepuasanPage() {
                 'Unit Layanan': t.unit,
                 'Skor Rata-Rata': t.skor,
                 Saran: t.feedback
-            })))
+            }))
+
+            const unitRankingSheetData = unitRankingData.map((u, i) => ({
+                'Peringkat': i + 1,
+                'Unit Layanan': u.name,
+                'Total Ulasan': u.count,
+                'Skor Kepuasan': Number(u.skor).toFixed(2)
+            }))
+
+            const worksheet = xlsx.utils.json_to_sheet([])
+
+            xlsx.utils.sheet_add_aoa(worksheet, [
+                [appSettings.kop_nama.toUpperCase()],
+                [appSettings.kop_rs.toUpperCase()],
+                [`${appSettings.kop_alamat} | ${appSettings.kop_kontak}`],
+                [],
+                ['LAPORAN HASIL ANALISIS SURVEI KEPUASAN MASYARAKAT (IKM)'],
+                [`Tanggal Cetak: ${new Date(printDate).toLocaleDateString('id-ID')}`],
+                [],
+                [`Total Responden: ${totalRespondents} orang`],
+                [`Indeks Kepuasan Global: ${globalAvg}/4.00`],
+                [`Predikat: ${Number(globalAvg) >= 3.5 ? 'Sangat Baik' : Number(globalAvg) >= 3.0 ? 'Baik' : Number(globalAvg) >= 2.0 ? 'Kurang' : 'Buruk'}`],
+                [],
+                ['1. Rekapitulasi Penilaian per Unit Kerja']
+            ], { origin: 'A1' })
+
+            xlsx.utils.sheet_add_json(worksheet, unitRankingSheetData, { origin: 'A14' })
+
+            xlsx.utils.sheet_add_aoa(worksheet, [
+                [''],
+                ['2. Tabulasi Responden Survei Kepuasan (Detil Lengkap)']
+            ], { origin: `A${15 + unitRankingSheetData.length}` })
+
+            xlsx.utils.sheet_add_json(worksheet, worksheetData, { origin: `A${18 + unitRankingSheetData.length}` })
+
             const workbook = xlsx.utils.book_new()
-            xlsx.utils.book_append_sheet(workbook, worksheet, "Analisis_Kepuasan")
+            xlsx.utils.book_append_sheet(workbook, worksheet, "Analisis_Kepuasan_Komprehensif")
             xlsx.writeFile(workbook, `Report_Kepuasan_Layanan_${new Date().toISOString().slice(0, 10)}.xlsx`)
             setIsGenerating(false)
         }, 1000)
+    }
+
+    const handleExportPDF = () => {
+        setIsGenerating(true)
+        setTimeout(() => {
+            const predicate = Number(globalAvg) >= 3.5 ? 'Sangat Baik' : Number(globalAvg) >= 3.0 ? 'Baik' : Number(globalAvg) >= 2.0 ? 'Kurang' : 'Buruk';
+
+            // First table: Unit ranking
+            const tableHeaders = ['Peringkat', 'Unit Layanan', 'Total Responden', 'Indeks / Skor Kepuasan'];
+            const pdfTableData = unitRankingData.map((u, i) => [
+                i + 1,
+                u.name,
+                u.count,
+                `${Number(u.skor).toFixed(2)}/4.00`
+            ]);
+
+            // Second table: Respondents
+            const tableHeadersBottom = ['No', 'Tanggal', 'Responden (Pekerjaan)', 'Unit Layanan', 'Skor', 'Saran / Masukan'];
+            const pdfTableDataBottom = tableData.map(t => [
+                t.no,
+                t.tanggal,
+                `${t.nama} (${t.pekerjaan})`,
+                t.unit,
+                t.skor,
+                t.feedback
+            ]);
+
+            generateFormalPDF({
+                title: 'LAPORAN HASIL ANALISIS SURVEI KEPUASAN MASYARAKAT (IKM)',
+                additionalInfo: [
+                    `Total Responden: ${totalRespondents} orang | Indeks Kepuasan Global: ${globalAvg}/4.00 | Predikat Penilaian Mutu: ${predicate}`,
+                    '',
+                    '1. Profil Penilaian Kepuasan per Unit Kerja:'
+                ],
+                filename: `Report_IKM_Komprehensif_${new Date().toISOString().slice(0, 10)}.pdf`,
+                appSettings,
+                printDate,
+                signerName,
+                signerRole,
+                tableHeaders,
+                tableData: pdfTableData,
+                additionalInfoBottom: [
+                    '',
+                    '2. Tabulasi Responden dan Umpan Balik Layanan:'
+                ],
+                tableHeadersBottom,
+                tableDataBottom: pdfTableDataBottom
+            });
+            setIsGenerating(false)
+        }, 500)
     }
 
     return (
@@ -166,15 +274,16 @@ export default function AnalisisKepuasanPage() {
                         className="px-5 py-2.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
                     >
                         <Download className="w-5 h-5 text-emerald-600" />
-                        {isGenerating ? 'Memroses...' : 'Ekspor Excel'}
+                        {isGenerating ? 'Memroses...' : 'Unduh Excel'}
                     </button>
 
                     <button
-                        onClick={() => window.print()}
-                        className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-md shadow-indigo-600/20"
+                        onClick={handleExportPDF}
+                        disabled={isGenerating}
+                        className="px-5 py-2.5 bg-slate-900 border border-slate-800 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
                     >
-                        <FileText className="w-5 h-5 text-white" />
-                        Unduh PDF
+                        <FileText className="w-5 h-5 text-indigo-400" />
+                        {isGenerating ? 'Memroses...' : 'Unduh PDF'}
                     </button>
                 </div>
             </div>
@@ -325,6 +434,46 @@ export default function AnalisisKepuasanPage() {
                             <div className="text-center text-slate-400 font-medium text-sm">Belum ada data</div>
                         )}
                     </div>
+                </div>
+            </div>
+
+            {/* GRAFIK RANKING UNIT KERJA */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-8 print:hidden p-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <div>
+                        <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2"><Award className="w-5 h-5 text-amber-500" /> Ranking Kepuasan Unit Kerja</h3>
+                        <p className="text-xs font-medium text-slate-500 mt-1">Perbandingan skor rata-rata CSAT antar unit pelayanan</p>
+                    </div>
+                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                        <button onClick={() => setRankingFilter('all')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${rankingFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Semua Unit</button>
+                        <button onClick={() => setRankingFilter('top10')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${rankingFilter === 'top10' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Top 10</button>
+                        <button onClick={() => setRankingFilter('bottom10')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${rankingFilter === 'bottom10' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Bottom 10</button>
+                    </div>
+                </div>
+                <div className="h-[350px] w-full">
+                    {unitRankingData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={unitRankingData} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                <XAxis type="number" domain={[0, 4]} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                                <YAxis dataKey="name" type="category" width={150} tick={{ fontSize: 11, fontWeight: 600, fill: '#475569' }} axisLine={false} tickLine={false} />
+                                <RechartsTooltip
+                                    cursor={{ fill: '#f8fafc' }}
+                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}
+                                />
+                                <Bar dataKey="skor" radius={[0, 4, 4, 0]} barSize={20}>
+                                    {unitRankingData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.skor >= 3.5 ? '#10b981' : entry.skor >= 2.5 ? '#3b82f6' : '#f43f5e'} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                            <p className="text-sm font-medium">Belum ada data survei untuk unit kerja.</p>
+                        </div>
+                    )}
                 </div>
             </div>
 

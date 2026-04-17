@@ -9,6 +9,7 @@ import {
 } from 'recharts'
 import { motion } from 'framer-motion'
 import * as xlsx from 'xlsx'
+import { generateFormalPDF } from '@/utils/pdfExport'
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316']
 
@@ -87,19 +88,104 @@ export default function AdminAnalisaPage() {
     const handleExportExcel = () => {
         setIsGenerating(true)
         setTimeout(() => {
-            const worksheetData = tickets.map((t, index) => ({
+            const periodeText = filterPeriode ? new Date(filterPeriode + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) : 'Keseluruhan waktu'
+            const unitText = filterUnit ? units.find(u => u.id === filterUnit)?.nama || filterUnit : 'Seluruh Unit Global'
+
+            const worksheetData1 = pieData.map((t, index) => ({
                 No: index + 1,
-                Kategori: t.jenis.replace('_', ' ').toUpperCase(),
-                'Unit Tujuan': t.units?.nama || 'Global',
-                Status: t.status,
-                Tanggal: new Date(t.created_at).toLocaleString('id-ID')
+                'Kategori Laporan': t.name,
+                'Jumlah Tiket': t.value,
+                'Persentase': (countTotal > 0 ? Math.round((t.value / countTotal) * 100) : 0) + '%'
             }))
-            const worksheet = xlsx.utils.json_to_sheet(worksheetData)
+
+            const worksheetData2 = areaData.map((t, index) => ({
+                No: index + 1,
+                'Bulan / Periode': t.name,
+                'Total Interaksi': t.Total
+            }))
+
+            const worksheet = xlsx.utils.json_to_sheet([])
+
+            xlsx.utils.sheet_add_aoa(worksheet, [
+                [appSettings.kop_nama.toUpperCase()],
+                [appSettings.kop_rs.toUpperCase()],
+                [`${appSettings.kop_alamat} | ${appSettings.kop_kontak}`],
+                [],
+                ['LAPORAN ANALISIS DATA & PERFORMA LAYANAN EKSKUTIF (KOMPREHENSIF)'],
+                [`Periode: ${periodeText} | Unit: ${unitText}`],
+                [`Tanggal Cetak: ${new Date(printDate).toLocaleDateString('id-ID')}`],
+                [`Penanggung Jawab: ${signerName} (${signerRole})`],
+                [],
+                [`Total Interaksi: ${countTotal} Tiket Laporan Masuk`],
+                [`Tingkat Penyelesaian: ${countSelesai} Laporan Berhasil Ditangani (${resolveRate}%)`],
+                [`Estimasi Rata-rata Kepuasan (CSAT): ${csatSimulated}/5.0`],
+                [],
+                ['A. Rekapitulasi Berdasarkan Kategori Layanan']
+            ], { origin: 'A1' })
+
+            xlsx.utils.sheet_add_json(worksheet, worksheetData1, { origin: 'A15' })
+
+            xlsx.utils.sheet_add_aoa(worksheet, [
+                ['B. Tren Pelaporan Bulanan / Periode']
+            ], { origin: `A${18 + worksheetData1.length}` })
+
+            xlsx.utils.sheet_add_json(worksheet, worksheetData2, { origin: `A${20 + worksheetData1.length}` })
+
             const workbook = xlsx.utils.book_new()
-            xlsx.utils.book_append_sheet(workbook, worksheet, "Data_Analisa")
-            xlsx.writeFile(workbook, `Laporan_Analisa_${new Date().toISOString().slice(0, 10)}.xlsx`)
+            xlsx.utils.book_append_sheet(workbook, worksheet, "Laporan_Analisa_Ekskutif")
+            xlsx.writeFile(workbook, `Laporan_Analisa_Komprehensif_${new Date().toISOString().slice(0, 10)}.xlsx`)
             setIsGenerating(false)
         }, 1000)
+    }
+
+    const handleExportPDF = () => {
+        setIsGenerating(true)
+        setTimeout(() => {
+            const periodeText = filterPeriode ? new Date(filterPeriode + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) : 'Keseluruhan waktu'
+            const unitText = filterUnit ? units.find(u => u.id === filterUnit)?.nama || filterUnit : 'Seluruh Unit Global'
+
+            const tableHeaders = ['No', 'Kategori Laporan (Jenis Tiket)', 'Jumlah Tiket', 'Persentase'];
+            const tableData = pieData.map((t, index) => [
+                index + 1,
+                t.name,
+                t.value,
+                (countTotal > 0 ? Math.round((t.value / countTotal) * 100) : 0) + '%'
+            ]);
+
+            const tableHeader2 = ['No', 'Periode Tren (Bulan)', 'Total Interaksi Tiket', 'Tingkat Kesiagaan'];
+            const tableData2 = areaData.map((t, index) => [
+                index + 1,
+                t.name,
+                t.Total,
+                'Normal / Stabil'
+            ]);
+
+            generateFormalPDF({
+                title: 'LAPORAN ANALISIS DATA & PERFORMA LAYANAN (EKSKUTIF)',
+                subtitle: `Periode: ${periodeText} | Unit Kerja: ${unitText}`,
+                additionalInfo: [
+                    'Laporan ini menyajikan rekapitulasi data layanan berdasarkan performa resolusi dan beban interaksi.',
+                    `Metrik Utama: Total Interaksi ${countTotal} Tiket | Penyelesaian ${countSelesai} (${resolveRate}%) | Indeks CSAT Prediktif ${csatSimulated}/5.0`,
+                    '',
+                    'A. Rekapitulasi Berdasarkan Kategori Layanan:'
+                ],
+                filename: `Laporan_Analisa_Komprehensif_${new Date().toISOString().slice(0, 10)}.pdf`,
+                appSettings,
+                printDate,
+                signerName,
+                signerRole,
+                tableHeaders,
+                tableData,
+                // Passing a second table explicitly simulating extra content below the first table
+                additionalInfoBottom: [
+                    '',
+                    'B. Analisis Tren Pelaporan Bulanan:'
+                ],
+                tableHeadersBottom: tableHeader2,
+                tableDataBottom: tableData2
+            });
+            setIsGenerating(false)
+        }, 500)
     }
 
     // Calculate metrics
@@ -152,10 +238,11 @@ export default function AdminAnalisaPage() {
                             <Download className="w-4 h-4" /> Excel
                         </button>
                         <button
-                            onClick={() => window.print()}
-                            className="flex items-center gap-2 bg-slate-900 border border-slate-800 text-white hover:bg-slate-800 px-4 py-2 text-sm rounded-xl font-bold transition-all shadow-sm"
+                            onClick={handleExportPDF}
+                            disabled={isGenerating}
+                            className="flex items-center gap-2 bg-slate-900 border border-slate-800 text-white hover:bg-slate-800 px-4 py-2 text-sm rounded-xl font-bold transition-all shadow-sm disabled:opacity-50"
                         >
-                            <FileText className="w-4 h-4" /> Unduh PDF
+                            <FileText className="w-4 h-4" /> {isGenerating ? 'Memroses...' : 'Unduh PDF'}
                         </button>
                     </div>
                 </div>
